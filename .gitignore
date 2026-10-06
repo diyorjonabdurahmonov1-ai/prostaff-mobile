@@ -5,39 +5,74 @@ node_modules/
 
 # Expo
 .expo/
+.expo-shared/
 dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# generated native folders (expo prebuild)
+/ios
+/android
+
+# Native / signing
 .kotlin/
+.gradle/
 *.orig.*
 *.jks
+*.keystore
+!debug.keystore
 *.p8
 *.p12
 *.key
 *.mobileprovision
+*.pem
+*.apk
+*.aab
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Firebase service account key — this one signs pushes on your behalf and must
+# never be committed. (google-services.json is fine: it ships inside the APK.)
+*firebase-adminsdk*.json
+google-service-account*.json
 
 # Metro
 .metro-health-check*
 
-# debug
+# env files (keep .env.example)
+.env
+.env.*
+!.env.example
+
+# debug / logs
 npm-debug.*
 yarn-debug.*
 yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
+*.log
 
 # typescript
 *.tsbuildinfo
 
-example
+# tests
+coverage/
 
-# generated native folders
-/ios
-/android
+# IDE / editor
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# scratch
+tmp/
+example

@@ -1,6 +1,11 @@
-import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
+import {
+  Platform,
+  StyleSheet,
+  type TextProps,
+} from 'react-native';
+import { Text } from '@/components/text';
 
-import { Fonts, ThemeColor } from '@/constants/theme';
+import { Fonts, ThemeColor, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ThemedTextProps = TextProps & {
@@ -30,41 +35,15 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
   );
 }
 
+// Mapped onto the iOS type ramp so legacy call sites match the design system.
 const styles = StyleSheet.create({
-  small: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 500,
-  },
-  smallBold: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 700,
-  },
-  default: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: 500,
-  },
-  title: {
-    fontSize: 48,
-    fontWeight: 600,
-    lineHeight: 52,
-  },
-  subtitle: {
-    fontSize: 32,
-    lineHeight: 44,
-    fontWeight: 600,
-  },
-  link: {
-    lineHeight: 30,
-    fontSize: 14,
-  },
-  linkPrimary: {
-    lineHeight: 30,
-    fontSize: 14,
-    color: '#3c87f7',
-  },
+  small: Type.footnote,
+  smallBold: Type.footnoteEmphasized,
+  default: Type.body,
+  title: Type.largeTitle,
+  subtitle: Type.title2,
+  link: Type.subhead,
+  linkPrimary: { ...Type.subhead, color: '#007AFF' },
   code: {
     fontFamily: Fonts.mono,
     fontWeight: Platform.select({ android: 700 }) ?? 500,
