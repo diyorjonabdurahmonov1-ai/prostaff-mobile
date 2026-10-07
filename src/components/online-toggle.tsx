@@ -34,6 +34,13 @@ interface OnlineToggleProps {
   disabled?: boolean;
   onLabel: string;
   offLabel: string;
+  /**
+   * The worker is on a job. A third state, not a flavour of "online": no new
+   * work arrives until this one ends, so the switch says so and stops taking
+   * taps — flipping availability mid-job means nothing to the dispatcher.
+   */
+  onJob?: boolean;
+  onJobLabel?: string;
   /** Track width. Defaults to the screen minus the wide gutter on both sides. */
   width?: number;
 }
@@ -44,6 +51,8 @@ export function OnlineToggle({
   disabled = false,
   onLabel,
   offLabel,
+  onJob = false,
+  onJobLabel = '',
   width,
 }: OnlineToggleProps) {
   const theme = useTheme();
@@ -52,7 +61,8 @@ export function OnlineToggle({
 
   // One driver for the knob, the track fill and both labels, so nothing can
   // land out of step with the rest.
-  const on = useDerivedValue(() => (online ? 1 : 0), [online]);
+  const on = useDerivedValue(() => (online || onJob ? 1 : 0), [online, onJob]);
+  const job = useDerivedValue(() => (onJob ? 1 : 0), [onJob]);
 
   const knob = useAnimatedStyle(() => ({
     transform: [
@@ -64,8 +74,18 @@ export function OnlineToggle({
     opacity: withTiming(on.value, { duration: Duration.base, easing: Ease.out }),
   }));
 
+  // The amber wash lies over the green one, so going on a job reads as the
+  // live state changing colour rather than switching off and on again.
+  const jobFill = useAnimatedStyle(() => ({
+    opacity: withTiming(job.value, { duration: Duration.base, easing: Ease.out }),
+  }));
+
   const onText = useAnimatedStyle(() => ({
-    opacity: withTiming(on.value, { duration: Duration.fast, easing: Ease.out }),
+    opacity: withTiming(on.value * (1 - job.value), { duration: Duration.fast, easing: Ease.out }),
+  }));
+
+  const jobText = useAnimatedStyle(() => ({
+    opacity: withTiming(job.value, { duration: Duration.fast, easing: Ease.out }),
   }));
 
   const offText = useAnimatedStyle(() => ({
@@ -74,14 +94,18 @@ export function OnlineToggle({
 
   return (
     <PressableScale
-      onPress={() => onChange(!online)}
+      // A tap mid-job does nothing, but the switch stays at full colour: it is
+      // reporting a state, not greyed out as broken.
+      onPress={() => {
+        if (!onJob) onChange(!online);
+      }}
       disabled={disabled}
       scaleTo={0.985}
-      accessibilityLabel={online ? onLabel : offLabel}
+      accessibilityLabel={onJob ? onJobLabel : online ? onLabel : offLabel}
       style={[
         styles.track,
         { width: track, backgroundColor: theme.fillTertiary },
-        online ? Shadow.card : null,
+        online || onJob ? Shadow.card : null,
       ]}>
       <Animated.View style={[StyleSheet.absoluteFill, styles.fill, fill]}>
         <LinearGradient
@@ -91,15 +115,23 @@ export function OnlineToggle({
           style={StyleSheet.absoluteFill}
         />
       </Animated.View>
+      <Animated.View style={[StyleSheet.absoluteFill, styles.fill, jobFill]}>
+        <LinearGradient
+          colors={[Gradients.busy[0], Gradients.busy[1]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
 
       {/* Knob on the left when offline, so the label reads to its right. */}
       <Animated.View style={[styles.knobWrap, knob]}>
-        <PulseRing size={KNOB} color="#FFFFFF" active={online} to={1.6} />
-        <View style={[styles.knob, { backgroundColor: online ? '#FFFFFF' : theme.surface }]}>
+        <PulseRing size={KNOB} color="#FFFFFF" active={online && !onJob} to={1.6} />
+        <View style={[styles.knob, { backgroundColor: online || onJob ? '#FFFFFF' : theme.surface }]}>
           <Icon
-            name={online ? 'radio' : 'moon'}
+            name={onJob ? 'briefcase' : online ? 'radio' : 'moon'}
             size={24}
-            color={online ? theme.success : theme.textMuted}
+            color={onJob ? theme.warning : online ? theme.success : theme.textMuted}
           />
         </View>
       </Animated.View>
@@ -113,6 +145,11 @@ export function OnlineToggle({
         numberOfLines={1}
         style={[Type.bodyEmphasized, styles.label, styles.labelOn, styles.onColor, onText]}>
         {onLabel}
+      </Animated.Text>
+      <Animated.Text
+        numberOfLines={1}
+        style={[Type.bodyEmphasized, styles.label, styles.labelOn, styles.onColor, jobText]}>
+        {onJobLabel}
       </Animated.Text>
     </PressableScale>
   );

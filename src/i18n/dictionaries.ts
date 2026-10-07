@@ -369,6 +369,8 @@ export const uz = {
   'worker.onlineHint': 'Buyurtmalarni qabul qilyapsiz',
   'worker.offlineHint': 'Buyurtmalar kelmaydi',
   'worker.searchingJobs': 'Ish qidirmoqda',
+  'worker.onJob': 'Buyurtmada',
+  'worker.onJobDoing': 'Ish bajarilmoqda',
   'worker.todayHint':
     "Bugun ishlamoqchi bo'lgan yo'nalishlaringizni belgilang — faqat shular bo'yicha buyurtma keladi.",
   'worker.editPrices': 'Narx va kategoriyalarni tahrirlash',
@@ -929,6 +931,8 @@ export const ru: Dictionary = {
   'worker.onlineHint': 'Вы принимаете заказы',
   'worker.offlineHint': 'Заказы не поступают',
   'worker.searchingJobs': 'Ищу заказы',
+  'worker.onJob': 'На заказе',
+  'worker.onJobDoing': 'Работа выполняется',
   'worker.todayHint':
     'Отметьте направления, по которым готовы работать сегодня — заказы придут только по ним.',
   'worker.editPrices': 'Изменить цены и категории',
@@ -1468,6 +1472,8 @@ export const en: Dictionary = {
   'worker.onlineHint': 'You are receiving orders',
   'worker.offlineHint': 'No orders will arrive',
   'worker.searchingJobs': 'Looking for jobs',
+  'worker.onJob': 'On a job',
+  'worker.onJobDoing': 'Work in progress',
   'worker.todayHint':
     'Pick the categories you want to work today — only those orders will reach you.',
   'worker.editPrices': 'Edit prices and categories',

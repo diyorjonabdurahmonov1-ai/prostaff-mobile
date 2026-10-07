@@ -157,12 +157,17 @@ export default function WorkerPanelScreen() {
               styles.avatarWrap,
               // The glow ring is the passive twin of the toggle: from across a
               // room you can tell whether you are taking work.
-              online ? { shadowColor: theme.success, ...styles.glow } : null,
+              online ? { shadowColor: activeOrder ? theme.warning : theme.success, ...styles.glow } : null,
             ]}
           >
             <Avatar name={profile.full_name} imageUrl={profile.avatar_url} size={48} />
             {online ? (
-              <View style={[styles.avatarRing, { borderColor: `${theme.success}40` }]} />
+              <View
+                style={[
+                  styles.avatarRing,
+                  { borderColor: `${activeOrder ? theme.warning : theme.success}40` },
+                ]}
+              />
             ) : null}
           </View>
 
@@ -224,6 +229,8 @@ export default function WorkerPanelScreen() {
             onChange={setOnline}
             onLabel={`${t('common.online')} · ${t('worker.searchingJobs')}`}
             offLabel={t('common.offline')}
+            onJob={!!activeOrder}
+            onJobLabel={`${t('worker.onJob')} · ${t('worker.onJobDoing')}`}
           />
           <Text style={[Type.footnote, styles.hint, { color: theme.textSecondary }]}>
             {activeOrder
@@ -248,78 +255,82 @@ export default function WorkerPanelScreen() {
           </FadeUp>
         ) : null}
 
-        {/* ---- Jobs waiting for an answer ---- */}
-        <View style={styles.incoming}>
-          <View style={styles.incomingHead}>
-            <View
-              style={[
-                styles.incomingDot,
-                { backgroundColor: incoming.length > 0 ? theme.success : theme.textTertiary },
-              ]}
-            />
-            <Text
-              style={[Type.footnoteEmphasized, styles.incomingTitle, { color: theme.textSecondary }]}
-            >
-              {incoming.length > 0
-                ? `${t('incoming.feedTitle')} · ${incoming.length}`
-                : t('incoming.feedTitle')}
-            </Text>
-            <Pressable
-              onPress={() => router.push('/worker/orders')}
-              hitSlop={8}
-              style={({ pressed }) => (pressed ? styles.pressed : undefined)}
-            >
-              <Text style={[Type.footnoteEmphasized, { color: theme.primary }]}>
-                {t('incoming.seeAll')}
-              </Text>
-            </Pressable>
-          </View>
-
-          {incoming.length > 0 ? (
-            incoming.map((order, index) => (
-              <IncomingOrderCard
-                key={order.id}
-                order={order}
-                profile={profile}
-                busy={answeringId === order.id}
-                onAccept={() => answer(order.id, 'accept')}
-                onReject={() => answer(order.id, 'reject')}
-                onOpen={() => router.push({ pathname: '/work/[id]', params: { id: order.id } })}
-                // Only the newest job carries a map on the panel.
-                compact={index > 0}
-              />
-            ))
-          ) : (
-            // The poller runs every 4s, so an empty slot is the normal resting
-            // state — it says "listening", not "something went wrong".
-            <View style={[styles.waitCard, Squircle, { backgroundColor: theme.surface }]}>
+        {/* ---- Jobs waiting for an answer ---- Not while on a job: no new work
+            reaches a worker until the one in hand ends, and a "waiting for
+            orders" card under it said the opposite. */}
+        {activeOrder ? null : (
+          <View style={styles.incoming}>
+            <View style={styles.incomingHead}>
               <View
                 style={[
-                  styles.waitGlyph,
-                  { backgroundColor: online ? theme.successSoftSolid : theme.fillQuaternary },
+                  styles.incomingDot,
+                  { backgroundColor: incoming.length > 0 ? theme.success : theme.textTertiary },
                 ]}
+              />
+              <Text
+                style={[Type.footnoteEmphasized, styles.incomingTitle, { color: theme.textSecondary }]}
               >
-                <Icon
-                  name={online ? 'search' : 'moon'}
-                  size={22}
-                  color={online ? theme.successDark : theme.textTertiary}
-                />
-              </View>
-              <View style={styles.waitText}>
-                <Text style={[Type.subheadEmphasized, { color: theme.text }]}>
-                  {ordersLoading
-                    ? t('common.loading')
-                    : online
-                      ? t('incoming.waiting')
-                      : t('worker.offlineHint')}
+                {incoming.length > 0
+                  ? `${t('incoming.feedTitle')} · ${incoming.length}`
+                  : t('incoming.feedTitle')}
+              </Text>
+              <Pressable
+                onPress={() => router.push('/worker/orders')}
+                hitSlop={8}
+                style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+              >
+                <Text style={[Type.footnoteEmphasized, { color: theme.primary }]}>
+                  {t('incoming.seeAll')}
                 </Text>
-                <Text style={[Type.footnote, { color: theme.textSecondary }]}>
-                  {online ? t('incoming.waitingHint') : t('incoming.offlineHint')}
-                </Text>
-              </View>
+              </Pressable>
             </View>
-          )}
-        </View>
+
+            {incoming.length > 0 ? (
+              incoming.map((order, index) => (
+                <IncomingOrderCard
+                  key={order.id}
+                  order={order}
+                  profile={profile}
+                  busy={answeringId === order.id}
+                  onAccept={() => answer(order.id, 'accept')}
+                  onReject={() => answer(order.id, 'reject')}
+                  onOpen={() => router.push({ pathname: '/work/[id]', params: { id: order.id } })}
+                  // Only the newest job carries a map on the panel.
+                  compact={index > 0}
+                />
+              ))
+            ) : (
+              // The poller runs every 4s, so an empty slot is the normal resting
+              // state — it says "listening", not "something went wrong".
+              <View style={[styles.waitCard, Squircle, { backgroundColor: theme.surface }]}>
+                <View
+                  style={[
+                    styles.waitGlyph,
+                    { backgroundColor: online ? theme.successSoftSolid : theme.fillQuaternary },
+                  ]}
+                >
+                  <Icon
+                    name={online ? 'search' : 'moon'}
+                    size={22}
+                    color={online ? theme.successDark : theme.textTertiary}
+                  />
+                </View>
+                <View style={styles.waitText}>
+                  <Text style={[Type.subheadEmphasized, { color: theme.text }]}>
+                    {ordersLoading
+                      ? t('common.loading')
+                      : online
+                        ? t('incoming.waiting')
+                        : t('worker.offlineHint')}
+                  </Text>
+                  <Text style={[Type.footnote, { color: theme.textSecondary }]}>
+                    {online ? t('incoming.waitingHint') : t('incoming.offlineHint')}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* ---- Money ---- */}
         <FadeUp index={3} step={Stagger.card} style={styles.block}>

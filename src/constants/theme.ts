@@ -49,6 +49,8 @@ export const Gradients = {
   wallet: ['#3B84FF', '#1355C4'] as const,
   success: ['#12B76A', '#059669'] as const,
   urgent: ['#F97066', '#F43F5E'] as const,
+  /** A worker on a job — the "Buyurtmada" state of the availability switch. */
+  busy: ['#F79009', '#DC6803'] as const,
 };
 
 /* ------------------------------------------------------------------ *
