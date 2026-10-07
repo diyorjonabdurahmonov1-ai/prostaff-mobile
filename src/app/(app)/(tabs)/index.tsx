@@ -81,8 +81,8 @@ export default function HomeScreen() {
   const { panel: panelParam } = useLocalSearchParams<{ panel?: string }>();
   useFocusEffect(
     useCallback(() => {
-      if (panelParam !== 'workers') return;
-      setSection('workers');
+      if (panelParam !== 'workers' && panelParam !== 'companies') return;
+      setSection(panelParam);
       router.setParams({ panel: undefined });
     }, [panelParam, router])
   );
@@ -527,7 +527,12 @@ function CompaniesListScreen({ onBack }: { onBack: () => void }) {
       const data = await api.get<CompanyProfile[]>(
         `/companies?lat=${point.lat}&lng=${point.lng}&radius_km=${radiusKm}`,
       );
-      setCompanies(data ?? []);
+      // Firms that can take the job now first, then by distance as the server
+      // sent them. An offline firm cannot be ordered from (its page says so),
+      // so it was noise at the top of the list.
+      setCompanies(
+        [...(data ?? [])].sort((a, b) => Number(!!b.online) - Number(!!a.online)),
+      );
     } catch {
     } finally {
       setLoading(false);

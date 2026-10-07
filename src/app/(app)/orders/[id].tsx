@@ -79,8 +79,10 @@ export default function OrderDetailScreen() {
     try {
       await api.post<Order>(`/orders/${order.id}/cancel`);
       await load();
-    } catch {
-      // ignore — the row will catch up on the next read
+    } catch (err) {
+      // Said out loud: a cancel that silently did nothing left the customer
+      // believing the order was gone while it was still out there.
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('common.genericError'));
     } finally {
       setBusy(false);
     }
@@ -118,6 +120,8 @@ export default function OrderDetailScreen() {
 
   /** Back to the list of nearby workers, to choose somebody by hand. */
   const pickOther = () => router.navigate({ pathname: '/', params: { panel: 'workers' } });
+  /** Back to the firms list — the way on from a firm that said no. */
+  const pickOtherFirm = () => router.navigate({ pathname: '/', params: { panel: 'companies' } });
 
   /** Re-open the broadcast: every nearby worker is rung again. */
   const searchAgain = async () => {
@@ -154,6 +158,10 @@ export default function OrderDetailScreen() {
    */
   const droppedByWorker = order.status === 'cancelled' && !!order.worker_id;
   const notified = order.invited_worker_ids?.length ?? 0;
+
+  const firmRecover = (
+    <Button label={t('company.pickOther')} icon="business" onPress={pickOtherFirm} />
+  );
 
   /** Two ways forward once nobody is going to come: everyone, or somebody chosen. */
   const recover = (primary: 'all' | 'again') => (
@@ -211,7 +219,9 @@ export default function OrderDetailScreen() {
       case 'invited':
       case 'matching':
         // The search runs on the server; the only useful action is to stop it.
-        return isCompanyOrder && order.status === 'pending' ? null : (
+        // A firm's order too: it has no clock, so without this a firm that
+        // never answered kept the customer waiting on it indefinitely.
+        return (
           <Button
             label={t('waiting.cancel')}
             icon="close"
@@ -224,9 +234,9 @@ export default function OrderDetailScreen() {
       // would ring the worker who just said no, so the way forward is everyone
       // else — or somebody the customer picks.
       case 'rejected':
-        return isCompanyOrder ? null : recover('all');
+        return isCompanyOrder ? firmRecover : recover('all');
       case 'cancelled':
-        if (isCompanyOrder) return null;
+        if (isCompanyOrder) return firmRecover;
         if (droppedByWorker) return recover('all');
         return (
           <Button
@@ -239,7 +249,7 @@ export default function OrderDetailScreen() {
       // The window ran out. Re-opening it is the right first move — a worker
       // may simply have been busy — with choosing by hand beside it.
       case 'expired':
-        return isCompanyOrder ? null : recover('again');
+        return isCompanyOrder ? firmRecover : recover('again');
       case 'accepted':
       case 'in_progress':
         return (
@@ -277,8 +287,13 @@ export default function OrderDetailScreen() {
         <StatusPill status={order.status} />
       </View>
 
-      {isCustomer && !isCompanyOrder ? (
-        <OutcomeBanner order={order} droppedByWorker={droppedByWorker} notified={notified} />
+      {isCustomer ? (
+        <OutcomeBanner
+          order={order}
+          droppedByWorker={droppedByWorker}
+          notified={notified}
+          isCompanyOrder={isCompanyOrder}
+        />
       ) : null}
 
       <Section
@@ -346,15 +361,47 @@ function OutcomeBanner({
   order,
   droppedByWorker,
   notified,
+  isCompanyOrder,
 }: {
   order: Order;
   droppedByWorker: boolean;
   notified: number;
+  isCompanyOrder: boolean;
 }) {
   const t = useT();
   const theme = useTheme();
 
   const content = ((): { icon: IconName; tone: 'danger' | 'warning' | 'primary'; title: string; body: string } | null => {
+    // A firm's order is addressed to one firm and has no search behind it, so
+    // it has its own three things to say.
+    if (isCompanyOrder) {
+      switch (order.status) {
+        case 'pending':
+          return {
+            icon: 'hourglass',
+            tone: 'primary',
+            title: t('outcome.companyWaitingTitle'),
+            body: t('outcome.companyWaitingBody'),
+          };
+        case 'rejected':
+          return {
+            icon: 'close-circle',
+            tone: 'danger',
+            title: t('outcome.companyRejectedTitle'),
+            body: t('outcome.companyRejectedBody'),
+          };
+        case 'cancelled':
+        case 'expired':
+          return {
+            icon: 'warning',
+            tone: 'warning',
+            title: t('outcome.companyCancelledTitle'),
+            body: t('outcome.companyCancelledBody'),
+          };
+        default:
+          return null;
+      }
+    }
     switch (order.status) {
       case 'matching':
       case 'invited':

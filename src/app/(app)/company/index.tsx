@@ -6,13 +6,14 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   View,
 } from 'react-native';
 import { Text } from '@/components/text';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ActiveJobCard } from '@/components/active-job-card';
 import { AlertBannerList } from '@/components/alert-banner';
+import { OnlineToggle } from '@/components/online-toggle';
 import { PROVIDER_NAV_HEIGHT, ProviderNav } from '@/components/provider-nav';
 import { StatusPill } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,8 @@ import { Layout, Radius, Squircle, Type } from '@/constants/theme';
 import { useRefresh } from '@/hooks/use-refresh';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
+import { YandexMap } from '@/components/yandex-map';
+import { hasCoords } from '@/lib/maps';
 import { api } from '@/lib/api';
 import { formatSom, telUrl } from '@/lib/format';
 import { switchRoot } from '@/lib/nav';
@@ -83,17 +86,29 @@ export default function CompanyPanelScreen() {
     }
   };
 
-  /** Answered orders, most recent first — the panel shows a glimpse, the
-   *  orders screen shows the rest. */
-  const recent = useMemo(() => orders.filter((o) => o.status !== 'pending').slice(0, 3), [orders]);
-  /** One job at a time: a company on an active order takes nothing new. */
-  const busy = active.length > 0;
+  /**
+   * Answered orders that are over, most recent first — the panel shows a
+   * glimpse, the orders screen shows the rest. Jobs still in hand have their
+   * own cards above.
+   */
+  const recent = useMemo(
+    () => orders.filter((o) => o.status !== 'pending' && !active.includes(o)).slice(0, 3),
+    [orders, active],
+  );
+
+  /*
+   * No "one job at a time" here. That rule came over from the worker, who is
+   * one person; a firm is a team, and greying out "Qabul qilish" the moment it
+   * held one job turned away every other customer for the length of it.
+   */
 
   const setOnline = async (online: boolean) => {
     setToggling(true);
     try {
       await api.post<CompanyProfile>('/company/status', { online });
       await refreshMe();
+    } catch (err) {
+      Alert.alert(t('common.error'), err instanceof Error && err.message ? err.message : t('common.networkError'));
     } finally {
       setToggling(false);
     }
@@ -134,26 +149,39 @@ export default function CompanyPanelScreen() {
           />
         ) : null}
 
-        {/* Availability */}
-        <Section
-          header={t('profile.activeMode')}
-          footer={online ? t('worker.onlineHint') : t('worker.offlineHint')}
-          separatorInset={Row.ICON_INSET}>
-          <Row
-            icon={online ? 'radio' : 'moon'}
-            iconColor={online ? theme.success : theme.textMuted}
-            title={online ? t('common.online') : t('common.offline')}
-            right={
-              <Switch
-                value={online}
-                onValueChange={setOnline}
-                disabled={toggling}
-                trackColor={{ true: theme.success, false: theme.fill }}
-                ios_backgroundColor={theme.fill}
-              />
-            }
+        {/* Availability — the same big switch the worker has: whether orders
+            reach the firm is the most consequential setting on this screen. */}
+        <View style={styles.toggle}>
+          <OnlineToggle
+            online={online}
+            disabled={toggling}
+            onChange={setOnline}
+            onLabel={`${t('common.online')} · ${t('company.takingOrders')}`}
+            offLabel={t('common.offline')}
           />
-        </Section>
+          <Text style={[Type.footnote, styles.toggleHint, { color: theme.textSecondary }]}>
+            {online ? t('company.onlineHint') : t('company.offlineHint')}
+          </Text>
+        </View>
+
+        {/* Jobs in hand: who, where, and — so a job a customer walked away
+            from can never block the firm for good — a way to call it off. */}
+        {active.length > 0 ? (
+          <View style={styles.activeJobs}>
+            <Text style={[Type.footnote, styles.caption, { color: theme.textSecondary }]}>
+              {t('company.activeJobs', { n: active.length }).toUpperCase()}
+            </Text>
+            {active.map((order) => (
+              <ActiveJobCard
+                key={order.id}
+                order={order}
+                canComplete={false}
+                onOpen={() => router.push({ pathname: '/work/[id]', params: { id: order.id } })}
+                onEnded={() => Promise.all([loadOrders(), refreshMe()])}
+              />
+            ))}
+          </View>
+        ) : null}
 
         {/* Stats */}
         <View style={styles.stats}>
@@ -170,27 +198,27 @@ export default function CompanyPanelScreen() {
             plainly so "why am I not getting orders" has an answer on the same
             screen as the online toggle. */}
         <Section
-          header="Hisob"
+          header={t('company.account')}
           style={styles.section}
           separatorInset={Row.ICON_INSET}
-          footer="Firma har bir ishdan komissiya emas, oylik to'lov to'laydi. To'lov Atmos orqali amalga oshiriladi.">
+          footer={t('company.accountHint')}>
           <Row
             icon={profile.subscription_active ? 'checkmark-circle' : 'warning'}
             iconColor={profile.subscription_active ? theme.success : theme.warning}
-            title="Obuna"
+            title={t('subscription.title')}
             value={
               profile.subscription_active
-                ? `${profile.subscription_days_left} kun qoldi`
+                ? `${profile.subscription_days_left} ${t('subscription.daysLeft')}`
                 : profile.subscription_until
-                  ? 'Muddati tugagan'
-                  : 'Rasmiylashtirilmagan'
+                  ? t('subscription.expired')
+                  : t('subscription.none')
             }
           />
           {profile.subscription_until ? (
             <Row
               icon="calendar-outline"
               iconColor={theme.primary}
-              title="Amal qilish muddati"
+              title={t('subscription.until')}
               value={new Date(profile.subscription_until).toLocaleDateString()}
             />
           ) : null}
@@ -198,7 +226,7 @@ export default function CompanyPanelScreen() {
             <Row
               icon="sparkle"
               iconColor="#AF52DE"
-              title="Bepul buyurtmalar"
+              title={t('subscription.freeLeft')}
               value={`${Math.max(profile.free_orders_limit - profile.free_orders_used, 0)} / ${profile.free_orders_limit}`}
             />
           ) : null}
@@ -223,10 +251,7 @@ export default function CompanyPanelScreen() {
           <>
             {/* Answer here — a company never searches for workers */}
             {pending.length > 0 ? (
-              <Section
-                header={t('company.newOrders')}
-                style={styles.section}
-                footer={busy ? t('order.busyWorker') : undefined}>
+              <Section header={t('company.newOrders')} style={styles.section}>
                 {pending.map((order) => (
                   <View key={order.id} style={styles.pendingCard}>
                     <View style={styles.orderTop}>
@@ -258,17 +283,21 @@ export default function CompanyPanelScreen() {
                         .filter(Boolean)
                         .join(' · ') || '—'}
                     </Text>
-                    {order.lat !== 0 || order.lng !== 0 ? (
-                      <Text style={[Type.footnote, { color: theme.textSecondary }]}>
-                        {order.lat.toFixed(4)}, {order.lng.toFixed(4)}
-                      </Text>
+                    {/* Where the job is, on the map — the firm is deciding
+                        whether it can get there, and a pair of raw coordinates
+                        answered nothing. */}
+                    {hasCoords(order) ? (
+                      <YandexMap
+                        point={{ lat: order.lat, lng: order.lng }}
+                        height={140}
+                        caption={t('order.location')}
+                      />
                     ) : null}
                     <View style={styles.orderActions}>
                       <Button
                         label={t('company.acceptOrder')}
                         icon="checkmark"
                         loading={respondingId === order.id}
-                        disabled={busy}
                         onPress={() => respond(order, 'accept')}
                       />
                       <Button
@@ -370,6 +399,10 @@ function StatTile({
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { paddingTop: 12 },
+  toggle: { paddingHorizontal: Layout.gutterWide },
+  toggleHint: { marginTop: 10, paddingHorizontal: 4 },
+  activeJobs: { marginTop: 28, paddingHorizontal: Layout.gutter, gap: 12 },
+  caption: { paddingHorizontal: 4 },
   section: { marginTop: 28 },
   alerts: { paddingHorizontal: Layout.gutter, marginBottom: 20 },
 

@@ -39,12 +39,19 @@ export function ActiveJobCard({
   order,
   onOpen,
   onEnded,
+  canComplete = true,
 }: {
   order: Order;
   /** The full job screen. */
   onOpen: () => void;
   /** Called once the job is over, so the home screen can re-read its state. */
   onEnded: () => Promise<unknown> | void;
+  /**
+   * Whether this side can mark the job finished. A firm cannot yet — the
+   * server lets only the customer close a firm's job — so its card offers the
+   * way out (cancel) without a finish button that would only fail.
+   */
+  canComplete?: boolean;
 }) {
   const t = useT();
   const { lang } = useI18n();
@@ -238,7 +245,7 @@ export function ActiveJobCard({
             <Icon name="close" size={20} color={theme.danger} />
             <Text style={[Type.bodyEmphasized, { color: theme.danger }]}>{t('job.cancel')}</Text>
           </Pressable>
-          {gathering ? null : (
+          {gathering || !canComplete ? null : (
             <Button
               label={t('job.done')}
               icon="checkmark"

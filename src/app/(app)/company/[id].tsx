@@ -62,7 +62,8 @@ export default function CompanyDetailScreen() {
   const [busy, setBusy] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [done, setDone] = useState(false);
+  /** The order just placed — the success screen opens it. */
+  const [placed, setPlaced] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Resolve GPS as soon as the order form opens — the company needs an address.
@@ -127,20 +128,30 @@ export default function CompanyDetailScreen() {
 
   const { refreshControl } = useRefresh(load);
 
+  /**
+   * Only a place the customer actually is, or picked.
+   *
+   * The GPS helper answers a refused permission with central Tashkent, and the
+   * form used to send that — a firm drove to the city centre for a job on the
+   * other side of it. A guess is now only where the map starts: the customer
+   * confirms a point on it, or allows location, before the order can go.
+   */
+  const locationReady = !!coords?.resolved;
+
   const sendOrder = async () => {
-    if (!id || description.trim().length === 0) return;
+    if (!id || description.trim().length === 0 || !locationReady) return;
     setBusy(true);
     setError(null);
     try {
-      await api.post<Order>(`/companies/${id}/order`, {
+      const order = await api.post<Order>(`/companies/${id}/order`, {
         description: description.trim(),
         phone: phone.trim(),
         name: name.trim(),
         images,
-        lat: coords?.lat ?? 0,
-        lng: coords?.lng ?? 0,
+        lat: coords!.lat,
+        lng: coords!.lng,
       });
-      setDone(true);
+      setPlaced(order);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('common.genericError'));
       setBusy(false);
@@ -156,20 +167,26 @@ export default function CompanyDetailScreen() {
     );
   }
 
-  if (done) {
+  if (placed) {
     return (
       <Screen scroll={false} padded={false} contentStyle={styles.successWrap}>
         <View style={[styles.successGlyph, { backgroundColor: theme.successSoft }]}>
           <Icon name="checkmark" size={44} color={theme.success} />
         </View>
         <Text style={[Type.title2, styles.centerText, { color: theme.text }]}>
-          {t('company.sendOrder')}
+          {t('company.sentTitle')}
         </Text>
         <Text style={[Type.subhead, styles.centerText, { color: theme.textSecondary }]}>
-          {t('company.noOrdersHint')}
+          {t('company.sentBody')}
         </Text>
         <View style={styles.successAction}>
-          <Button label={t('common.done')} onPress={() => router.navigate('/')} />
+          {/* Straight to the order: that is where its answer will show up. */}
+          <Button
+            label={t('company.viewOrder')}
+            icon="reader"
+            onPress={() => router.replace({ pathname: '/orders/[id]', params: { id: placed.id } })}
+          />
+          <Button label={t('common.done')} variant="gray" onPress={() => router.navigate('/')} />
         </View>
       </Screen>
     );
@@ -214,12 +231,22 @@ export default function CompanyDetailScreen() {
          firm accepts. */
       footer={
         <View style={styles.footer}>
-          {showOrderForm ? (
+          {!company.online ? (
+            // An offline firm is not taking work; an order sent now would sit
+            // unanswered with no clock on it. Point at the firms that are.
+            <Button
+              label={t('company.pickOther')}
+              icon="business"
+              variant="gray"
+              style={styles.primaryBtn}
+              onPress={() => router.navigate({ pathname: '/', params: { panel: 'companies' } })}
+            />
+          ) : showOrderForm ? (
             <Button
               label={t('company.sendOrder')}
               style={styles.primaryBtn}
               loading={busy}
-              disabled={!description.trim()}
+              disabled={!description.trim() || !locationReady}
               onPress={sendOrder}
             />
           ) : (
@@ -244,6 +271,15 @@ export default function CompanyDetailScreen() {
           dot
         />
       </View>
+
+      {!company.online ? (
+        <View style={[styles.offline, Squircle, { backgroundColor: theme.warningSoft }]}>
+          <Icon name="moon" size={18} color={theme.warning} />
+          <Text style={[Type.footnote, styles.locationText, { color: theme.text }]}>
+            {t('company.offlineNotice')}
+          </Text>
+        </View>
+      ) : null}
 
       {/* How big, how long — the two questions customers ask on the phone.
           The rating is not repeated here; the hero already shows it as stars. */}
@@ -398,9 +434,17 @@ export default function CompanyDetailScreen() {
                 ? t('order.locationDetecting')
                 : coords.resolved
                   ? t('order.locationReady')
-                  : t('order.locationDenied')}
+                  : t('company.needLocation')}
             </Text>
           </View>
+          {coords && !coords.resolved ? (
+            <Button
+              label={t('company.pickOnMap')}
+              icon="location"
+              variant="secondary"
+              onPress={() => setPickerOpen(true)}
+            />
+          ) : null}
 
           {error ? (
             <Text style={[Type.footnote, styles.centerText, { color: theme.danger }]}>{error}</Text>
@@ -517,5 +561,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 10,
   },
-  successAction: { alignSelf: 'stretch', marginTop: 24 },
+  successAction: { alignSelf: 'stretch', marginTop: 24, gap: 8 },
+  offline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: Layout.gutter,
+    marginBottom: 20,
+    padding: 14,
+    borderRadius: Radius.card,
+  },
 });
