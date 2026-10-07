@@ -244,8 +244,8 @@ function FirmCard({
   const cover = resolveImageUrl(firm.images?.[0]) ?? resolveImageUrl(firm.avatar_url);
 
   /**
-   * Where this card is relative to the centre, in cards: 0 in front, -1 one
-   * place to the right, +1 one to the left. Everything 3D is read off it.
+   * Where this card is relative to the centre, in cards: 0 in front, +1 one
+   * place to the right, -1 one to the left. Everything 3D is read off it.
    */
   const card = useAnimatedStyle(() => {
     const p = interpolate(
@@ -255,9 +255,15 @@ function FirmCard({
       Extrapolation.CLAMP,
     );
     return {
-      opacity: interpolate(Math.abs(p), [0, 1], [1, 0.55]),
+      opacity: interpolate(Math.abs(p), [0, 1], [1, 0.7]),
+      // The front card sits on top of the two it overlaps.
+      zIndex: Math.round(10 - Math.abs(p) * 10),
       transform: [
         { perspective: 900 },
+        // Pulled in towards the centre: scaled and turned, a neighbour would
+        // otherwise shrink clean off the edge of the screen and the shelf would
+        // look like a single card with nothing to swipe to.
+        { translateX: -p * width * 0.2 },
         { translateY: interpolate(Math.abs(p), [0, 1], [0, 16]) },
         { rotateY: `${p * -38}deg` },
         { scale: interpolate(Math.abs(p), [0, 1], [1, 0.84]) },
