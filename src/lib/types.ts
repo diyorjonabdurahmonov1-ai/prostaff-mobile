@@ -265,6 +265,12 @@ export interface Order {
   status: OrderStatus;
   invited_worker_ids: string[];
   invite_expires_at?: string;
+  /**
+   * Shared by the orders of one "N workers" request — sent on create. Optional
+   * here because a server may not echo it back; see `lib/batches.ts`.
+   */
+  batch_id?: string;
+  batch_size?: number;
   created_at: string;
 }
 
