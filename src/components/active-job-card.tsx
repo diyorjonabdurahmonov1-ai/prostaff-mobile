@@ -76,7 +76,12 @@ export function ActiveJobCard({
   const end = async (how: Ending) => {
     setBusy(true);
     try {
-      await api.post(`/worker/orders/${order.id}/${how}`);
+      // Cancelling is the API's own provider exit (the same call the order
+      // screen makes). Finishing from the worker's side is new: the server has
+      // so far let only the customer mark a job complete.
+      await api.post(
+        how === 'cancel' ? `/orders/${order.id}/cancel` : `/worker/orders/${order.id}/complete`,
+      );
       setConfirm(null);
       await onEnded();
     } catch (err) {
