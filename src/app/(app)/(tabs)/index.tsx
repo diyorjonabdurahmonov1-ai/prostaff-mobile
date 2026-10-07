@@ -1,6 +1,6 @@
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect, usePathname, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
@@ -69,6 +69,23 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user, activeMode } = useAuth();
   const [section, setSection] = useState<Panel>('home');
+
+  /**
+   * `?panel=workers` opens straight onto the nearby-workers list.
+   *
+   * An order screen sends a customer here when the worker they picked said no
+   * ("Boshqa ishchi tanlash"). The list is state on this screen rather than a
+   * route, so it is opened from the parameter, and the parameter is dropped
+   * at once so coming back to the tab later lands on the home panel as usual.
+   */
+  const { panel: panelParam } = useLocalSearchParams<{ panel?: string }>();
+  useFocusEffect(
+    useCallback(() => {
+      if (panelParam !== 'workers') return;
+      setSection('workers');
+      router.setParams({ panel: undefined });
+    }, [panelParam, router])
+  );
 
   /**
    * The customer home is not where a worker or a firm belongs.
