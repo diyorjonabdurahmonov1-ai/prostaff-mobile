@@ -31,6 +31,7 @@ import {
   Squircle,
   Type,
 } from '@/constants/theme';
+import { OnlineCompaniesCarousel } from '@/components/online-companies-carousel';
 import { YandexMap } from '@/components/yandex-map';
 import { useCategories } from '@/hooks/use-categories';
 import { useRefresh } from '@/hooks/use-refresh';
@@ -173,6 +174,12 @@ export default function HomeScreen() {
           </Pressable>
           <Avatar name={userName} imageUrl={user?.avatar_url} size={46} />
         </View>
+
+        {/* Who can take a job this minute — the online firms, as a swipeable
+            showcase. It sits above the two entry points because it answers the
+            same question with a face and a photo, and it removes itself when
+            nobody is online. */}
+        <OnlineCompaniesCarousel />
 
         {/* The two ways into the platform, at the size of the decision.
 

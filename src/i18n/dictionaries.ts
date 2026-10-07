@@ -191,6 +191,8 @@ export const uz = {
   'home.noCompanies': "Hozircha onlayn firmalar yo'q",
   'home.companyRating': 'Reyting',
   'home.startOrder': 'Buyurtma berish',
+  'home.onlineFirms': 'Hozir onlayn firmalar',
+  'home.featured': 'Tavsiya',
 
   // categories fallback names (backend provides localized names)
   'category.pickHint': 'Kerakli xizmatni tanlang',
@@ -753,6 +755,8 @@ export const ru: Dictionary = {
   'home.noCompanies': 'Пока нет онлайн компаний',
   'home.companyRating': 'Рейтинг',
   'home.startOrder': 'Заказать',
+  'home.onlineFirms': 'Компании онлайн',
+  'home.featured': 'Рекомендуем',
 
   'category.pickHint': 'Выберите нужную услугу',
 
@@ -1280,6 +1284,8 @@ export const en: Dictionary = {
   'home.noCompanies': 'No online companies yet',
   'home.companyRating': 'Rating',
   'home.startOrder': 'Place order',
+  'home.onlineFirms': 'Firms online now',
+  'home.featured': 'Featured',
 
   'category.pickHint': 'Pick the service you need',
 
