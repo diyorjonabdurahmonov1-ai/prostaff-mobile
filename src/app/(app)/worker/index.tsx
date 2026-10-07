@@ -53,6 +53,15 @@ export default function WorkerPanelScreen() {
   const insets = useSafeAreaInsets();
 
   const [busy, setBusy] = useState(false);
+  /**
+   * The state the worker just asked for, shown before the server confirms it.
+   *
+   * The switch used to sit still until a GPS fix, the request and a full
+   * `/me` refresh had all come back — seconds, on a weak connection — so a tap
+   * looked like it had not registered, and the second tap that followed sent
+   * the worker straight back to where they started.
+   */
+  const [pendingOnline, setPendingOnline] = useState<boolean | null>(null);
   const [answeringId, setAnsweringId] = useState<string | null>(null);
   const profile = user?.worker_profile ?? null;
 
@@ -98,17 +107,23 @@ export default function WorkerPanelScreen() {
     }
   };
 
-  const setOnline = async (online: boolean) => {
+  const setOnline = async (next: boolean) => {
+    if (busy) return;
     setBusy(true);
+    setPendingOnline(next);
     try {
-      const coords = online ? await getCoordsWithFallback() : null;
+      const coords = next ? await getCoordsWithFallback() : null;
       await api.post<WorkerProfile>('/worker/status', {
-        online,
+        online: next,
         lat: coords?.lat,
         lng: coords?.lng,
       });
       await refreshMe();
+    } catch (err) {
+      // The switch goes back to what the server still has, and says why.
+      Alert.alert(t('common.error'), err instanceof Error && err.message ? err.message : t('common.networkError'));
     } finally {
+      setPendingOnline(null);
       setBusy(false);
     }
   };
@@ -124,7 +139,7 @@ export default function WorkerPanelScreen() {
     );
   }
 
-  const online = profile.online;
+  const online = pendingOnline ?? profile.online;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>

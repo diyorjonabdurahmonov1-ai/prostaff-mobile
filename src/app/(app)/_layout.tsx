@@ -11,7 +11,6 @@ import {
 } from '@/lib/notifications';
 import { api } from '@/lib/api';
 import { useAuth } from '@/store/auth';
-import { getCoordsWithFallback } from '@/lib/location';
 import { OrderFlowProvider } from '@/store/order-flow';
 import { useInviteAlerts, useNotificationBridge } from '@/store/realtime';
 
@@ -60,17 +59,17 @@ export default function AppLayout() {
   // is noticed from another screen — no takeover, just a notification.
   useInviteAlerts(!!user?.worker_profile && !user.worker_profile.banned);
 
-  // Auto-online: when the user enters the app with worker or company mode,
-  // automatically set them online.
+  // Auto-online for firms: entering company mode puts the firm online.
+  //
+  // Workers are deliberately left out. Going online is the worker's own
+  // decision — it means their phone starts ringing with jobs — and switching
+  // them on behind their back undid the toggle: a worker who went offline was
+  // put straight back online the next time they opened the app.
   useEffect(() => {
     if (!user) return;
     (async () => {
       try {
-        if (activeMode === 'worker' && user.worker_profile && !user.worker_profile.online) {
-          const coords = await getCoordsWithFallback();
-          await api.post('/worker/status', { online: true, lat: coords.lat, lng: coords.lng });
-          refreshMe();
-        } else if (activeMode === 'company' && user.company_profile && !user.company_profile.online) {
+        if (activeMode === 'company' && user.company_profile && !user.company_profile.online) {
           await api.post('/company/status', { online: true });
           refreshMe();
         }
