@@ -1,10 +1,13 @@
 import { Stack, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { CardPaymentHost } from '@/components/card-payment-host';
 import { useTheme } from '@/hooks/use-theme';
+import { useWorkerLocation } from '@/hooks/use-worker-location';
+import { useT } from '@/i18n';
 import {
   consumeColdStartTap,
+  presentLocalNotification,
   onNotificationTap,
   startPushRegistration,
   type NotificationTap,
@@ -59,6 +62,9 @@ export default function AppLayout() {
   // is noticed from another screen — no takeover, just a notification.
   useInviteAlerts(!!user?.worker_profile && !user.worker_profile.banned);
 
+  // The worker's location, for every worker screen — see WorkerLocationGuard.
+  const isWorker = activeMode === 'worker' && !!user?.worker_profile;
+
   // Auto-online for firms: entering company mode puts the firm online.
   //
   // Workers are deliberately left out. Going online is the worker's own
@@ -100,9 +106,60 @@ export default function AppLayout() {
           to put the card and SMS-code steps on screen, so no screen that buys
           something has to know they exist. */}
       <CardPaymentHost />
+      {isWorker ? <WorkerLocationGuard /> : null}
       {/* Incoming jobs are not a takeover any more — they land as cards in the
           worker's list (see components/incoming-order-card.tsx); the push
           notification is what gets attention. */}
     </OrderFlowProvider>
   );
+}
+
+/**
+ * Keeps a worker's location true for as long as they are signed in as one.
+ *
+ * Lives here rather than on the worker's home screen so it keeps running on
+ * every worker screen (orders, wallet, profile), not only the one with the
+ * switch on it.
+ *
+ *   - While online, each move is reported with the same status call that put
+ *     the worker online, so dispatch measures "near" from where they are now.
+ *   - If location is switched off, or permission taken away, while online, the
+ *     worker is taken offline at once rather than left "online" at the last
+ *     place the app saw them — and told, in the tray as well as on screen,
+ *     since the switch is usually flipped from quick settings with this app in
+ *     the background. Once per lapse: it re-arms when location is back.
+ */
+function WorkerLocationGuard() {
+  const t = useT();
+  const { user, refreshMe } = useAuth();
+  const online = !!user?.worker_profile?.online;
+
+  const { status } = useWorkerLocation({
+    tracking: online,
+    onMove: (fix) => {
+      api.post('/worker/status', { online: true, lat: fix.lat, lng: fix.lng }).catch(() => {});
+    },
+  });
+  const blocked = status !== 'ok' && status !== 'checking';
+
+  const lapseRef = useRef(false);
+  useEffect(() => {
+    if (!blocked) {
+      lapseRef.current = false;
+      return;
+    }
+    if (!online || lapseRef.current) return;
+    lapseRef.current = true;
+    api
+      .post('/worker/status', { online: false })
+      .then(() => refreshMe())
+      .catch(() => {});
+    presentLocalNotification({
+      title: t('loc.lostTitle'),
+      body: t('loc.lostBody'),
+      data: { type: 'location.lost' },
+    });
+  }, [blocked, online, refreshMe, t]);
+
+  return null;
 }

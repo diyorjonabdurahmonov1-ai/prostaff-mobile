@@ -18,7 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { PulseRing } from '@/components/motion';
-import { Icon } from '@/components/ui/icon';
+import { Icon, type IconName } from '@/components/ui/icon';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Ease } from '@/constants/motion';
 import { Duration, Gradients, Motion, Radius, Shadow, Type } from '@/constants/theme';
@@ -41,6 +41,8 @@ interface OnlineToggleProps {
    */
   onJob?: boolean;
   onJobLabel?: string;
+  /** Knob icon while off — e.g. a pin when what is missing is the location. */
+  offIcon?: IconName;
   /** Track width. Defaults to the screen minus the wide gutter on both sides. */
   width?: number;
 }
@@ -53,6 +55,7 @@ export function OnlineToggle({
   offLabel,
   onJob = false,
   onJobLabel = '',
+  offIcon = 'moon',
   width,
 }: OnlineToggleProps) {
   const theme = useTheme();
@@ -129,7 +132,7 @@ export function OnlineToggle({
         <PulseRing size={KNOB} color="#FFFFFF" active={online && !onJob} to={1.6} />
         <View style={[styles.knob, { backgroundColor: online || onJob ? '#FFFFFF' : theme.surface }]}>
           <Icon
-            name={onJob ? 'briefcase' : online ? 'radio' : 'moon'}
+            name={onJob ? 'briefcase' : online ? 'radio' : offIcon}
             size={24}
             color={onJob ? theme.warning : online ? theme.success : theme.textMuted}
           />

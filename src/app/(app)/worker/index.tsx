@@ -23,10 +23,10 @@ import { Header } from '@/components/ui/header';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Layout, Radius, Squircle, Stagger, Type } from '@/constants/theme';
 import { useRefresh } from '@/hooks/use-refresh';
+import { getPreciseFix, useWorkerLocation, type LocationStatus } from '@/hooks/use-worker-location';
 import { useTheme } from '@/hooks/use-theme';
-import { useT } from '@/i18n';
+import { useT, type TranslationKey } from '@/i18n';
 import { api } from '@/lib/api';
-import { getCoordsWithFallback } from '@/lib/location';
 import { switchRoot } from '@/lib/nav';
 import type { WorkerProfile } from '@/lib/types';
 import { useAuth } from '@/store/auth';
@@ -106,12 +106,34 @@ export default function WorkerPanelScreen() {
     }
   };
 
+  /**
+   * Whether the app can see the worker. Following them while online, and
+   * taking them offline when location goes, happen in `(app)/_layout.tsx` so
+   * they keep running on every worker screen; this one only reads the status
+   * to draw the switch and the banner.
+   */
+  const location = useWorkerLocation({ tracking: false });
+  /** The app cannot place this worker, so it must not offer them work. */
+  const locationBlocked = location.status !== 'ok' && location.status !== 'checking';
+
   const setOnline = async (next: boolean) => {
     if (busy) return;
+    // No location, no online: the tap asks for it instead.
+    if (next && locationBlocked) {
+      await location.fix();
+      return;
+    }
     setBusy(true);
     setPendingOnline(next);
     try {
-      const coords = next ? await getCoordsWithFallback() : null;
+      // A real fix or nothing. Going online at a guessed position would put the
+      // worker in front of jobs across the city from where they stand.
+      const coords = next ? await getPreciseFix() : null;
+      if (next && !coords) {
+        await location.refresh();
+        Alert.alert(t('loc.noFixTitle'), t('loc.noFixBody'));
+        return;
+      }
       await api.post<WorkerProfile>('/worker/status', {
         online: next,
         lat: coords?.lat,
@@ -138,7 +160,10 @@ export default function WorkerPanelScreen() {
     );
   }
 
-  const online = pendingOnline ?? profile.online;
+  // Without a location the worker is offline in every way that matters to them
+  // (no orders reach them), whatever the server last heard — so the whole
+  // screen says so, not just the switch.
+  const online = (pendingOnline ?? profile.online) && !locationBlocked;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
@@ -223,19 +248,25 @@ export default function WorkerPanelScreen() {
 
         {/* ---- Availability ---- */}
         <FadeUp index={1} step={Stagger.card} style={styles.block}>
+          {locationBlocked ? (
+            <LocationBanner status={location.status} onFix={location.fix} />
+          ) : null}
           <OnlineToggle
             online={online}
             disabled={busy}
             onChange={setOnline}
             onLabel={`${t('common.online')} · ${t('worker.searchingJobs')}`}
-            offLabel={t('common.offline')}
+            offLabel={locationBlocked ? t(LOCATION_COPY[location.status].toggle) : t('common.offline')}
+            offIcon={locationBlocked ? 'location' : undefined}
             onJob={!!activeOrder}
             onJobLabel={`${t('worker.onJob')} · ${t('worker.onJobDoing')}`}
           />
           <Text style={[Type.footnote, styles.hint, { color: theme.textSecondary }]}>
             {activeOrder
               ? t('order.busyWorker')
-              : online
+              : locationBlocked
+                ? t('loc.toggleHint')
+                : online
                 ? t('worker.onlineHint')
                 : t('worker.offlineHint')}
           </Text>
@@ -384,6 +415,55 @@ export default function WorkerPanelScreen() {
   );
 }
 
+/* ===================== Location ===================== */
+
+/** What to say, and what the fix button does, for each way location can fail. */
+const LOCATION_COPY = {
+  denied: { toggle: 'loc.allow', body: 'loc.deniedBody', action: 'loc.allowAction' },
+  blocked: { toggle: 'loc.allow', body: 'loc.blockedBody', action: 'loc.settingsAction' },
+  off: { toggle: 'loc.turnOn', body: 'loc.offBody', action: 'loc.turnOnAction' },
+  checking: { toggle: 'loc.allow', body: 'loc.deniedBody', action: 'loc.allowAction' },
+  ok: { toggle: 'loc.allow', body: 'loc.deniedBody', action: 'loc.allowAction' },
+} as const satisfies Record<
+  LocationStatus,
+  { toggle: TranslationKey; body: TranslationKey; action: TranslationKey }
+>;
+
+/**
+ * "No location, no orders", where the worker cannot miss it: above the switch,
+ * in the colour the app uses for things that are stopping work.
+ */
+function LocationBanner({ status, onFix }: { status: LocationStatus; onFix: () => void }) {
+  const t = useT();
+  const theme = useTheme();
+  const copy = LOCATION_COPY[status];
+  return (
+    <View style={[styles.locBanner, Squircle, { backgroundColor: theme.dangerSoft }]}>
+      <View style={styles.locTop}>
+        <View style={[styles.locGlyph, { backgroundColor: theme.surface }]}>
+          <Icon name="location" size={22} color={theme.danger} />
+        </View>
+        <View style={styles.locText}>
+          <Text style={[Type.subheadEmphasized, { color: theme.text }]}>{t('loc.bannerTitle')}</Text>
+          <Text style={[Type.footnote, { color: theme.textSecondary }]}>{t(copy.body)}</Text>
+        </View>
+      </View>
+      <Pressable
+        onPress={onFix}
+        accessibilityRole="button"
+        style={({ pressed }) => [
+          styles.locBtn,
+          Squircle,
+          { backgroundColor: theme.danger },
+          pressed && styles.pressed,
+        ]}>
+        <Icon name="location" size={16} color="#FFFFFF" />
+        <Text style={[Type.subheadEmphasized, { color: '#FFFFFF' }]}>{t(copy.action)}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 /** One of the three standing figures. Counts up as the card lands. */
 function StatTile({
   value,
@@ -462,6 +542,25 @@ const styles = StyleSheet.create({
   },
 
   hint: { marginTop: 10, paddingHorizontal: 4 },
+
+  locBanner: { borderRadius: Radius.lg, padding: 14, gap: 12, marginBottom: 14 },
+  locTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  locGlyph: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locText: { flex: 1, gap: 3 },
+  locBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 44,
+    borderRadius: Radius.md,
+  },
 
   incoming: { marginTop: 24, gap: 12 },
   incomingHead: {
