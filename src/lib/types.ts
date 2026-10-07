@@ -111,6 +111,16 @@ export interface CompanyProfile {
   /** office location; 0,0 means no pin was ever set */
   lat: number;
   lng: number;
+  /**
+   * A firm that goes out to its customers (fuel delivery, a tow truck) can
+   * also share where its phone is now. While on, it is found near *both* its
+   * office and that live point, and orders come from around either.
+   */
+  live_location?: boolean;
+  live_lat?: number;
+  live_lng?: number;
+  /** when the live point was last reported */
+  live_updated_at?: string;
   /** distance from the customer — only on the nearby list, only for pinned firms */
   distance_km?: number;
   online: boolean;

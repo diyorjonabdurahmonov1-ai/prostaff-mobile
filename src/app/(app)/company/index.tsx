@@ -13,6 +13,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ActiveJobCard } from '@/components/active-job-card';
 import { AlertBannerList } from '@/components/alert-banner';
+import { LiveLocationCard } from '@/components/live-location-card';
 import { OnlineToggle } from '@/components/online-toggle';
 import { PROVIDER_NAV_HEIGHT, ProviderNav } from '@/components/provider-nav';
 import { StatusPill } from '@/components/ui/badge';
@@ -162,6 +163,12 @@ export default function CompanyPanelScreen() {
           <Text style={[Type.footnote, styles.toggleHint, { color: theme.textSecondary }]}>
             {online ? t('company.onlineHint') : t('company.offlineHint')}
           </Text>
+        </View>
+
+        {/* Where orders come from: the office, and — for a firm that goes out
+            to its customers — where it is right now. */}
+        <View style={styles.live}>
+          <LiveLocationCard firm={profile} onChanged={refreshMe} />
         </View>
 
         {/* Jobs in hand: who, where, and — so a job a customer walked away
@@ -401,6 +408,7 @@ const styles = StyleSheet.create({
   scroll: { paddingTop: 12 },
   toggle: { paddingHorizontal: Layout.gutterWide },
   toggleHint: { marginTop: 10, paddingHorizontal: 4 },
+  live: { marginTop: 20, paddingHorizontal: Layout.gutter },
   activeJobs: { marginTop: 28, paddingHorizontal: Layout.gutter, gap: 12 },
   caption: { paddingHorizontal: 4 },
   section: { marginTop: 28 },

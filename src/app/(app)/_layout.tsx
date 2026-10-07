@@ -3,7 +3,8 @@ import { useEffect, useRef } from 'react';
 
 import { CardPaymentHost } from '@/components/card-payment-host';
 import { useTheme } from '@/hooks/use-theme';
-import { useWorkerLocation } from '@/hooks/use-worker-location';
+import { useLiveLocation } from '@/hooks/use-live-location';
+import { setLiveLocation } from '@/lib/company-live';
 import { useT } from '@/i18n';
 import {
   consumeColdStartTap,
@@ -64,6 +65,7 @@ export default function AppLayout() {
 
   // The worker's location, for every worker screen — see WorkerLocationGuard.
   const isWorker = activeMode === 'worker' && !!user?.worker_profile;
+  const isCompany = activeMode === 'company' && !!user?.company_profile;
 
   // Auto-online for firms: entering company mode puts the firm online.
   //
@@ -107,6 +109,7 @@ export default function AppLayout() {
           something has to know they exist. */}
       <CardPaymentHost />
       {isWorker ? <WorkerLocationGuard /> : null}
+      {isCompany ? <CompanyLiveGuard /> : null}
       {/* Incoming jobs are not a takeover any more — they land as cards in the
           worker's list (see components/incoming-order-card.tsx); the push
           notification is what gets attention. */}
@@ -134,7 +137,7 @@ function WorkerLocationGuard() {
   const { user, refreshMe } = useAuth();
   const online = !!user?.worker_profile?.online;
 
-  const { status } = useWorkerLocation({
+  const { status } = useLiveLocation({
     tracking: online,
     onMove: (fix) => {
       api.post('/worker/status', { online: true, lat: fix.lat, lng: fix.lng }).catch(() => {});
@@ -160,6 +163,49 @@ function WorkerLocationGuard() {
       data: { type: 'location.lost' },
     });
   }, [blocked, online, refreshMe, t]);
+
+  return null;
+}
+
+/**
+ * A mobile firm's live position, for every firm screen.
+ *
+ * Reports where the phone is while the firm is online with live location on.
+ * If location goes away, live location is switched off rather than left
+ * pointing at the last place the phone was seen — the firm stays online, and
+ * keeps getting orders around its office, and is told exactly that.
+ */
+function CompanyLiveGuard() {
+  const t = useT();
+  const { user, refreshMe } = useAuth();
+  const firm = user?.company_profile;
+  const sharing = !!firm?.online && !!firm?.live_location;
+
+  const { status } = useLiveLocation({
+    tracking: sharing,
+    onMove: (fix) => {
+      setLiveLocation(true, fix).catch(() => {});
+    },
+  });
+  const blocked = status !== 'ok' && status !== 'checking';
+
+  const lapseRef = useRef(false);
+  useEffect(() => {
+    if (!blocked) {
+      lapseRef.current = false;
+      return;
+    }
+    if (!sharing || lapseRef.current) return;
+    lapseRef.current = true;
+    setLiveLocation(false)
+      .then(() => refreshMe())
+      .catch(() => {});
+    presentLocalNotification({
+      title: t('live.lostTitle'),
+      body: t('live.lostBody'),
+      data: { type: 'location.lost' },
+    });
+  }, [blocked, sharing, refreshMe, t]);
 
   return null;
 }

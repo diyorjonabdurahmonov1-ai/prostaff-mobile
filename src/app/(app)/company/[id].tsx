@@ -33,6 +33,7 @@ import { useCategories } from '@/hooks/use-categories';
 import { ApiError, api } from '@/lib/api';
 import { categoryName, formatSom } from '@/lib/format';
 import { MAX_ORDER_PHOTOS, resolveImageUrl } from '@/lib/image';
+import { hasCoords } from '@/lib/maps';
 import { getCoordsWithFallback } from '@/lib/location';
 import { pickAndUploadImage } from '@/lib/upload';
 import type { CompanyProfile, Order, Review } from '@/lib/types';
@@ -213,6 +214,8 @@ export default function CompanyDetailScreen() {
     .filter(Boolean);
   const services = company.services?.trim();
   const officePinned = !!company.lat && !!company.lng;
+  /** Out on the road: found near its office and near where it is now. */
+  const live = !!company.live_location && hasCoords({ lat: company.live_lat, lng: company.live_lng });
 
   const createdDate = new Date(company.created_at).toLocaleDateString(
     lang === 'uz' ? 'uz-UZ' : lang === 'ru' ? 'ru-RU' : 'en-US',
@@ -265,11 +268,14 @@ export default function CompanyDetailScreen() {
           {company.name}
         </Text>
         <Stars value={company.rating} showValue count={company.ratings_count} size={16} />
-        <Badge
-          label={company.online ? t('common.online') : t('common.offline')}
-          tone={company.online ? 'success' : 'neutral'}
-          dot
-        />
+        <View style={styles.badges}>
+          <Badge
+            label={company.online ? t('common.online') : t('common.offline')}
+            tone={company.online ? 'success' : 'neutral'}
+            dot
+          />
+          {live ? <Badge label={t('live.comesToYou')} tone="success" /> : null}
+        </View>
       </View>
 
       {!company.online ? (
@@ -359,13 +365,51 @@ export default function CompanyDetailScreen() {
 
       {/* Where the office is. Shown only when the firm actually dropped a pin —
           an unset record would otherwise point at 0,0 in the Atlantic. */}
-      {officePinned ? (
+      {officePinned || live ? (
         <View style={styles.mapWrap}>
+          {/* Both places on one map, labelled, so a customer is never left
+              wondering which pin the firm will come from. */}
           <YandexMap
-            point={{ lat: company.lat, lng: company.lng }}
-            height={180}
-            caption={t('companyDetail.address')}
+            point={
+              live
+                ? { lat: company.live_lat!, lng: company.live_lng! }
+                : { lat: company.lat, lng: company.lng }
+            }
+            height={200}
+            caption={live ? t('live.mapCaption') : t('companyDetail.address')}
+            markers={[
+              ...(officePinned
+                ? [{ lat: company.lat, lng: company.lng, hint: t('live.office'), color: 'primary' as const }]
+                : []),
+              ...(live
+                ? [
+                    {
+                      lat: company.live_lat!,
+                      lng: company.live_lng!,
+                      hint: t('live.hereNow'),
+                      color: 'warning' as const,
+                    },
+                  ]
+                : []),
+            ]}
           />
+          {live ? (
+            <View style={styles.legend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#1B6EF3' }]} />
+                <Text style={[Type.caption1, { color: theme.textSecondary }]}>{t('live.office')}</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#F79009' }]} />
+                <Text style={[Type.caption1, { color: theme.textSecondary }]}>{t('live.hereNow')}</Text>
+              </View>
+            </View>
+          ) : null}
+          {live ? (
+            <Text style={[Type.footnote, styles.liveNote, { color: theme.textSecondary }]}>
+              {t('live.customerNote')}
+            </Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -509,7 +553,12 @@ const styles = StyleSheet.create({
   section: { marginTop: 28 },
   caption: { paddingHorizontal: Layout.gutter + 4, marginBottom: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 14 },
-  mapWrap: { marginTop: 28, paddingHorizontal: Layout.gutter },
+  mapWrap: { marginTop: 28, paddingHorizontal: Layout.gutter, gap: 8 },
+  badges: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'center' },
+  legend: { flexDirection: 'row', gap: 16, paddingHorizontal: 4 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  liveNote: { paddingHorizontal: 4 },
 
 
   form: { marginTop: 28, paddingHorizontal: Layout.gutter, gap: 12 },

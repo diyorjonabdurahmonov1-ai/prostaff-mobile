@@ -23,7 +23,7 @@ import { Header } from '@/components/ui/header';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Layout, Radius, Squircle, Stagger, Type } from '@/constants/theme';
 import { useRefresh } from '@/hooks/use-refresh';
-import { getPreciseFix, useWorkerLocation, type LocationStatus } from '@/hooks/use-worker-location';
+import { getPreciseFix, useLiveLocation, type LocationStatus } from '@/hooks/use-live-location';
 import { useTheme } from '@/hooks/use-theme';
 import { useT, type TranslationKey } from '@/i18n';
 import { api } from '@/lib/api';
@@ -112,7 +112,7 @@ export default function WorkerPanelScreen() {
    * they keep running on every worker screen; this one only reads the status
    * to draw the switch and the banner.
    */
-  const location = useWorkerLocation({ tracking: false });
+  const location = useLiveLocation({ tracking: false });
   /** The app cannot place this worker, so it must not offer them work. */
   const locationBlocked = location.status !== 'ok' && location.status !== 'checking';
 

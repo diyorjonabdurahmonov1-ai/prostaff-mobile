@@ -1,5 +1,5 @@
 /**
- * The worker's location, kept honest.
+ * A provider's live location, kept honest — a worker's, or a mobile firm's.
  *
  * Dispatch rings the workers near a job, so a worker the app cannot place is a
  * worker who cannot be sent work — or worse, one who is sent the wrong work.
@@ -71,11 +71,11 @@ function metresBetween(a: Fix, b: Fix): number {
   return 6_371_000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-export function useWorkerLocation({
+export function useLiveLocation({
   tracking,
   onMove,
 }: {
-  /** Follow the phone and report moves — on while the worker is online. */
+  /** Follow the phone and report moves — on while the provider is sharing it. */
   tracking: boolean;
   /** Called with a fresh position, throttled by time and distance. */
   onMove?: (fix: Fix) => void;
