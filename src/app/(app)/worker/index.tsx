@@ -10,6 +10,7 @@ import {
 import { Text } from '@/components/text';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ActiveJobCard } from '@/components/active-job-card';
 import { AlertBannerList } from '@/components/alert-banner';
 import { BalanceCard } from '@/components/balance-card';
 import { IncomingOrderCard } from '@/components/incoming-order-card';
@@ -20,13 +21,11 @@ import { Avatar } from '@/components/ui/avatar';
 import { LoadingState } from '@/components/ui/empty-state';
 import { Header } from '@/components/ui/header';
 import { Icon, type IconName } from '@/components/ui/icon';
-import { PressableScale } from '@/components/ui/pressable-scale';
 import { Layout, Radius, Squircle, Stagger, Type } from '@/constants/theme';
 import { useRefresh } from '@/hooks/use-refresh';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { api } from '@/lib/api';
-import { formatSom } from '@/lib/format';
 import { getCoordsWithFallback } from '@/lib/location';
 import { switchRoot } from '@/lib/nav';
 import type { WorkerProfile } from '@/lib/types';
@@ -235,6 +234,20 @@ export default function WorkerPanelScreen() {
           </Text>
         </FadeUp>
 
+        {/* ---- The job in hand ---- Everything for it in one place, above the
+            feed: once a worker has a job, that job is what this screen is for. */}
+        {activeOrder ? (
+          <FadeUp index={2} step={Stagger.card} style={styles.block}>
+            <ActiveJobCard
+              order={activeOrder}
+              onOpen={() =>
+                router.push({ pathname: '/work/[id]', params: { id: activeOrder.id } })
+              }
+              onEnded={() => Promise.all([refresh(), refreshMe()])}
+            />
+          </FadeUp>
+        ) : null}
+
         {/* ---- Jobs waiting for an answer ---- */}
         <View style={styles.incoming}>
           <View style={styles.incomingHead}>
@@ -307,28 +320,6 @@ export default function WorkerPanelScreen() {
             </View>
           )}
         </View>
-
-        {activeOrder ? (
-          <FadeUp index={2} step={Stagger.card} style={styles.block}>
-            <PressableScale
-              onPress={() => router.push('/worker/orders')}
-              scaleTo={0.98}
-              style={[styles.activeCard, Squircle, { backgroundColor: theme.surface }]}
-            >
-              <View style={[styles.activeStrip, { backgroundColor: theme.warning }]} />
-              <Icon name="briefcase" size={24} color={theme.warning} />
-              <View style={styles.activeText}>
-                <Text style={[Type.subheadEmphasized, { color: theme.text }]} numberOfLines={1}>
-                  {activeOrder.description || t('company.orderTitle')}
-                </Text>
-                <Text style={[Type.footnote, { color: theme.textSecondary }]} numberOfLines={1}>
-                  {`${formatSom(activeOrder.price)} ${t('common.som')} · ${t('order.completeHint')}`}
-                </Text>
-              </View>
-              <Icon name="chevron-forward" size={18} color={theme.textTertiary} />
-            </PressableScale>
-          </FadeUp>
-        ) : null}
 
         {/* ---- Money ---- */}
         <FadeUp index={3} step={Stagger.card} style={styles.block}>
@@ -488,17 +479,6 @@ const styles = StyleSheet.create({
   },
   waitText: { flex: 1, gap: 2 },
 
-  activeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: Radius.card,
-    padding: 16,
-    paddingLeft: 20,
-    overflow: 'hidden',
-  },
-  activeStrip: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
-  activeText: { flex: 1, gap: 2 },
 
   stats: {
     flexDirection: 'row',
