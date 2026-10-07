@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState, LoadingState } from '@/components/ui/empty-state';
 import { Header } from '@/components/ui/header';
 import { Section } from '@/components/ui/list';
+import { Sheet } from '@/components/ui/sheet';
 import { Segmented } from '@/components/ui/segmented';
 import { Layout, Radius, Squircle, Type } from '@/constants/theme';
 import { useCategories } from '@/hooks/use-categories';
@@ -23,7 +24,15 @@ import { formatCountdown, useCountdown } from '@/hooks/use-countdown';
 import { useTheme } from '@/hooks/use-theme';
 import { useI18n, useT } from '@/i18n';
 import { api } from '@/lib/api';
-import { groupOrders, progressOf, retryMissing, slotOf, type OrderEntry, type Slot } from '@/lib/batches';
+import {
+  groupOrders,
+  progressOf,
+  retryMissing,
+  slotOf,
+  startWithFound,
+  type OrderEntry,
+  type Slot,
+} from '@/lib/batches';
 import { categoryName, formatSom } from '@/lib/format';
 import type { Order, OrderStatus } from '@/lib/types';
 
@@ -282,9 +291,12 @@ function BatchCard({
   const theme = useTheme();
   const { byId } = useCategories();
   const [busy, setBusy] = useState(false);
+  const [confirmStart, setConfirmStart] = useState(false);
 
   const first = orders[0];
   const { found, searching, missing, wanted } = progressOf(orders);
+  /** Some came, some are still owed — the workers found are waiting on a decision. */
+  const partial = found > 0 && found < wanted;
 
   const tint: Record<Slot, string> = {
     found: theme.success,
@@ -306,6 +318,22 @@ function BatchCard({
     }
   };
 
+  /** Go ahead with the workers found; nobody else is searched for. */
+  const start = async () => {
+    setBusy(true);
+    try {
+      const failed = await startWithFound(orders);
+      setConfirmStart(false);
+      if (failed > 0) Alert.alert(t('common.error'), t('batch.retryFailed', { n: failed }));
+      await onChanged();
+    } catch (err) {
+      setConfirmStart(false);
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('common.genericError'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <View style={[styles.batch, Squircle, { backgroundColor: theme.surface }]}>
       <View style={styles.batchHead}>
@@ -322,7 +350,10 @@ function BatchCard({
 
       <Text style={[Type.title3, { color: theme.text }]}>
         {found === wanted && wanted > 0
-          ? t('batch.allFound', { n: found })
+          ? // Fewer than asked for, by the customer's own choice to start.
+            wanted < orders.length
+            ? t('batch.startedWith', { n: found })
+            : t('batch.allFound', { n: found })
           : t('batch.progress', { found, total: wanted })}
       </Text>
 
@@ -370,6 +401,17 @@ function BatchCard({
         ))}
       </View>
 
+      {/* The workers who said yes are waiting: say so, and let the customer
+          release them without waiting for the rest. */}
+      {partial ? (
+        <View style={[styles.note, Squircle, { backgroundColor: theme.primarySoft }]}>
+          <Icon name="info" size={16} color={theme.primary} />
+          <Text style={[Type.footnote, styles.title, { color: theme.text }]}>
+            {t('batch.waitingNote', { n: found })}
+          </Text>
+        </View>
+      ) : null}
+
       {missing > 0 ? (
         <Button
           label={t('batch.retryMissing', { n: missing })}
@@ -378,6 +420,38 @@ function BatchCard({
           loading={busy}
         />
       ) : null}
+      {partial ? (
+        <Button
+          label={t('batch.startWithFound', { n: found })}
+          icon="checkmark-done"
+          variant="secondary"
+          onPress={() => setConfirmStart(true)}
+          disabled={busy}
+        />
+      ) : null}
+
+      <Sheet
+        visible={confirmStart}
+        onClose={() => !busy && setConfirmStart(false)}
+        title={t('batch.startTitle', { n: found })}
+        message={t('batch.startBody', { n: wanted - found, found })}
+        footer={
+          <>
+            <Button
+              label={t('batch.startYes')}
+              icon="checkmark-done"
+              loading={busy}
+              onPress={start}
+            />
+            <Button
+              label={t('job.no')}
+              variant="gray"
+              disabled={busy}
+              onPress={() => setConfirmStart(false)}
+            />
+          </>
+        }
+      />
     </View>
   );
 }
@@ -401,6 +475,13 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   segments: { flexDirection: 'row', gap: 4 },
+  note: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    borderRadius: Radius.md,
+  },
   segment: { flex: 1, height: 6, borderRadius: 3 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 2 },
   slots: { borderTopWidth: StyleSheet.hairlineWidth, marginHorizontal: -16, marginTop: 2 },

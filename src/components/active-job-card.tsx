@@ -73,6 +73,16 @@ export function ActiveJobCard({
   const name = order.customer_name || customer?.name || t('job.customer');
   const point = hasCoords(order) ? { lat: order.lat, lng: order.lng } : null;
 
+  /**
+   * Part of a team the customer is still putting together.
+   *
+   * Asked for four, two found: the two who said yes wait until the rest are
+   * found or the customer decides to start without them. Until then the server
+   * keeps the address and number back — a worker who set off now might arrive
+   * to a job that is called off for want of hands — and the card says why.
+   */
+  const gathering = (order.batch_size ?? 0) > 1 && order.batch_ready === false;
+
   const end = async (how: Ending) => {
     setBusy(true);
     try {
@@ -145,39 +155,60 @@ export function ActiveJobCard({
       </LinearGradient>
 
       <View style={styles.body}>
-        {/* ---- Who ---- */}
-        <View style={[styles.customer, Squircle, { backgroundColor: theme.fillQuaternary }]}>
-          <Avatar name={name} imageUrl={customer?.avatar_url} size={44} />
-          <View style={styles.flex}>
-            <Text style={[Type.caption1, { color: theme.textSecondary }]}>{t('job.customer')}</Text>
-            <Text style={[Type.subheadEmphasized, { color: theme.text }]} numberOfLines={1}>
-              {name}
-            </Text>
-            {phone ? (
-              <Text style={[Type.footnote, { color: theme.textSecondary }]} numberOfLines={1}>
-                {phone}
+        {gathering ? (
+          <View style={[styles.waiting, Squircle, { backgroundColor: theme.warningSoft }]}>
+            <View style={[styles.waitingGlyph, { backgroundColor: theme.surface }]}>
+              <Icon name="hourglass" size={22} color={theme.warning} />
+            </View>
+            <View style={styles.flex}>
+              <Text style={[Type.subheadEmphasized, { color: theme.text }]}>
+                {t('job.gatheringTitle')}
               </Text>
+              <Text style={[Type.footnote, { color: theme.textSecondary }]}>
+                {t('job.gatheringBody', {
+                  found: order.batch_found ?? 1,
+                  total: order.batch_size ?? 1,
+                })}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* ---- Who ---- */}
+        {gathering ? null : (
+          <View style={[styles.customer, Squircle, { backgroundColor: theme.fillQuaternary }]}>
+            <Avatar name={name} imageUrl={customer?.avatar_url} size={44} />
+            <View style={styles.flex}>
+              <Text style={[Type.caption1, { color: theme.textSecondary }]}>{t('job.customer')}</Text>
+              <Text style={[Type.subheadEmphasized, { color: theme.text }]} numberOfLines={1}>
+                {name}
+              </Text>
+              {phone ? (
+                <Text style={[Type.footnote, { color: theme.textSecondary }]} numberOfLines={1}>
+                  {phone}
+                </Text>
+              ) : null}
+            </View>
+            {phone ? (
+              <Pressable
+                onPress={() => Linking.openURL(telUrl(phone))}
+                accessibilityRole="button"
+                accessibilityLabel={t('incoming.callCustomer')}
+                style={({ pressed }) => [
+                  styles.callBtn,
+                  { backgroundColor: theme.success },
+                  pressed && styles.pressed,
+                ]}>
+                <Icon name="call" size={20} color="#FFFFFF" />
+              </Pressable>
             ) : null}
           </View>
-          {phone ? (
-            <Pressable
-              onPress={() => Linking.openURL(telUrl(phone))}
-              accessibilityRole="button"
-              accessibilityLabel={t('incoming.callCustomer')}
-              style={({ pressed }) => [
-                styles.callBtn,
-                { backgroundColor: theme.success },
-                pressed && styles.pressed,
-              ]}>
-              <Icon name="call" size={20} color="#FFFFFF" />
-            </Pressable>
-          ) : null}
-        </View>
+        )}
 
         {/* ---- Where ---- The same Yandex map the rest of the app uses; a tap
             anywhere on it, or on its "Yo'l ko'rsatish" pill, asks Yandex for
             directions. */}
-        {point ? (
+        {point && !gathering ? (
           <View style={styles.mapBlock}>
             <YandexMap
               point={point}
@@ -207,14 +238,16 @@ export function ActiveJobCard({
             <Icon name="close" size={20} color={theme.danger} />
             <Text style={[Type.bodyEmphasized, { color: theme.danger }]}>{t('job.cancel')}</Text>
           </Pressable>
-          <Button
-            label={t('job.done')}
-            icon="checkmark"
-            onPress={() => setConfirm('complete')}
-            disabled={busy}
-            fullWidth={false}
-            style={[styles.flex, { backgroundColor: theme.success }]}
-          />
+          {gathering ? null : (
+            <Button
+              label={t('job.done')}
+              icon="checkmark"
+              onPress={() => setConfirm('complete')}
+              disabled={busy}
+              fullWidth={false}
+              style={[styles.flex, { backgroundColor: theme.success }]}
+            />
+          )}
         </View>
       </View>
 
@@ -287,6 +320,20 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 12,
     borderRadius: Radius.lg,
+  },
+  waiting: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    padding: 12,
+    borderRadius: Radius.lg,
+  },
+  waitingGlyph: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   callBtn: {
     width: 46,

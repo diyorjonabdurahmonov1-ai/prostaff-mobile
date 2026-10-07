@@ -271,6 +271,16 @@ export interface Order {
    */
   batch_id?: string;
   batch_size?: number;
+  /**
+   * Whether the request this order belongs to is ready to start — every place
+   * filled, or the customer chose to start with the workers found so far.
+   * Until then the server keeps the customer's phone and address from the
+   * workers who accepted, and their job card says they are waiting.
+   * Absent from a server that does not gate batches; treated as ready.
+   */
+  batch_ready?: boolean;
+  /** How many places of the request are filled, for the waiting message. */
+  batch_found?: number;
   created_at: string;
 }
 

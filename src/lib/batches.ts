@@ -7,7 +7,7 @@
  * how many came, how many are still being looked for, and how many did not.
  */
 
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import type { Order, OrderStatus } from '@/lib/types';
 
 /**
@@ -107,4 +107,32 @@ export async function retryMissing(orders: Order[]): Promise<number> {
     missing.map((o) => api.post<Order>(`/orders/${o.id}/dispatch`)),
   );
   return results.filter((r) => r.status === 'rejected').length;
+}
+
+/**
+ * "Start with the workers I have": stop looking for the rest.
+ *
+ * Asks the server to start the request with the places filled so far, which
+ * also releases the customer's phone and address to the workers waiting on it.
+ * A server without that endpoint still gets the part it can do: every place
+ * still searching, or empty, is cancelled one by one, so nobody else is rung
+ * for a job the customer has closed.
+ *
+ * Returns how many places could not be closed.
+ */
+export async function startWithFound(orders: Order[]): Promise<number> {
+  const batchId = orders.find((o) => o.batch_id)?.batch_id;
+  if (batchId) {
+    try {
+      await api.post(`/orders/batch/${batchId}/start`);
+      return 0;
+    } catch (err) {
+      if (!(err instanceof ApiError && err.status === 404)) throw err;
+    }
+  }
+  const open = orders.filter((o) => slotOf(o) === 'searching' || o.status === 'expired');
+  const results = await Promise.allSettled(open.map((o) => api.post(`/orders/${o.id}/cancel`)));
+  // An expired order may already be closed for good; only a search that keeps
+  // running is a failure worth reporting.
+  return results.filter((r, i) => r.status === 'rejected' && slotOf(open[i]) === 'searching').length;
 }
