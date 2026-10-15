@@ -111,6 +111,16 @@ export interface CompanyProfile {
   /** office location; 0,0 means no pin was ever set */
   lat: number;
   lng: number;
+  /**
+   * A firm that goes out to its customers (fuel delivery, a tow truck) can
+   * also share where its phone is now. While on, it is found near *both* its
+   * office and that live point, and orders come from around either.
+   */
+  live_location?: boolean;
+  live_lat?: number;
+  live_lng?: number;
+  /** when the live point was last reported */
+  live_updated_at?: string;
   /** distance from the customer — only on the nearby list, only for pinned firms */
   distance_km?: number;
   online: boolean;
@@ -265,6 +275,22 @@ export interface Order {
   status: OrderStatus;
   invited_worker_ids: string[];
   invite_expires_at?: string;
+  /**
+   * Shared by the orders of one "N workers" request — sent on create. Optional
+   * here because a server may not echo it back; see `lib/batches.ts`.
+   */
+  batch_id?: string;
+  batch_size?: number;
+  /**
+   * Whether the request this order belongs to is ready to start — every place
+   * filled, or the customer chose to start with the workers found so far.
+   * Until then the server keeps the customer's phone and address from the
+   * workers who accepted, and their job card says they are waiting.
+   * Absent from a server that does not gate batches; treated as ready.
+   */
+  batch_ready?: boolean;
+  /** How many places of the request are filled, for the waiting message. */
+  batch_found?: number;
   created_at: string;
 }
 

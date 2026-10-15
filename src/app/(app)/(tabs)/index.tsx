@@ -1,6 +1,6 @@
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect, usePathname, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
@@ -31,6 +31,7 @@ import {
   Squircle,
   Type,
 } from '@/constants/theme';
+import { OnlineCompaniesCarousel } from '@/components/online-companies-carousel';
 import { YandexMap } from '@/components/yandex-map';
 import { useCategories } from '@/hooks/use-categories';
 import { useRefresh } from '@/hooks/use-refresh';
@@ -38,7 +39,8 @@ import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { useI18n, useT } from '@/i18n';
 import { api } from '@/lib/api';
 import { categoryName } from '@/lib/format';
-import { getCoordsWithFallback } from '@/lib/location';
+import { distanceKm, getCoordsWithFallback } from '@/lib/location';
+import { hasCoords } from '@/lib/maps';
 import { switchRoot } from '@/lib/nav';
 import type { LatLng } from '@/lib/maps';
 import type { CompanyProfile, WorkerProfile } from '@/lib/types';
@@ -68,6 +70,23 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user, activeMode } = useAuth();
   const [section, setSection] = useState<Panel>('home');
+
+  /**
+   * `?panel=workers` opens straight onto the nearby-workers list.
+   *
+   * An order screen sends a customer here when the worker they picked said no
+   * ("Boshqa ishchi tanlash"). The list is state on this screen rather than a
+   * route, so it is opened from the parameter, and the parameter is dropped
+   * at once so coming back to the tab later lands on the home panel as usual.
+   */
+  const { panel: panelParam } = useLocalSearchParams<{ panel?: string }>();
+  useFocusEffect(
+    useCallback(() => {
+      if (panelParam !== 'workers' && panelParam !== 'companies') return;
+      setSection(panelParam);
+      router.setParams({ panel: undefined });
+    }, [panelParam, router])
+  );
 
   /**
    * The customer home is not where a worker or a firm belongs.
@@ -173,6 +192,12 @@ export default function HomeScreen() {
           </Pressable>
           <Avatar name={userName} imageUrl={user?.avatar_url} size={46} />
         </View>
+
+        {/* Who can take a job this minute — the online firms, as a swipeable
+            showcase. It sits above the two entry points because it answers the
+            same question with a face and a photo, and it removes itself when
+            nobody is online. */}
+        <OnlineCompaniesCarousel />
 
         {/* The two ways into the platform, at the size of the decision.
 
@@ -377,6 +402,7 @@ function ResultCard({
   rating,
   count,
   online,
+  badge,
   imageUrl,
   selectable = false,
   selected = false,
@@ -389,6 +415,8 @@ function ResultCard({
   rating: number;
   count: number;
   online?: boolean;
+  /** A short green tag under the rating — e.g. a firm that comes to you. */
+  badge?: string;
   imageUrl?: string | null;
   /** Draws the tick and the "Profil ko'rish" button. */
   selectable?: boolean;
@@ -452,6 +480,15 @@ function ResultCard({
 
         <Stars value={rating} showValue count={count} size={11} />
 
+        {badge ? (
+          <View style={[styles.badge, { backgroundColor: theme.successSoft }]}>
+            <Icon name="crosshair" size={10} color={theme.success} />
+            <Text style={[Type.caption2Emphasized, { color: theme.success }]} numberOfLines={1}>
+              {badge}
+            </Text>
+          </View>
+        ) : null}
+
         {distanceKm != null ? (
           <View style={[styles.distance, { backgroundColor: theme.fillQuaternary }]}>
             <Icon name="location" size={10} color={theme.textSecondary} />
@@ -466,6 +503,11 @@ function ResultCard({
 }
 
 /* ===================== Companies List ===================== */
+
+/** A firm sharing a live position right now. */
+function isLive(c: CompanyProfile): boolean {
+  return !!c.live_location && hasCoords({ lat: c.live_lat, lng: c.live_lng });
+}
 
 function CompaniesListScreen({ onBack }: { onBack: () => void }) {
   const t = useT();
@@ -503,7 +545,12 @@ function CompaniesListScreen({ onBack }: { onBack: () => void }) {
       const data = await api.get<CompanyProfile[]>(
         `/companies?lat=${point.lat}&lng=${point.lng}&radius_km=${radiusKm}`,
       );
-      setCompanies(data ?? []);
+      // Firms that can take the job now first, then by distance as the server
+      // sent them. An offline firm cannot be ordered from (its page says so),
+      // so it was noise at the top of the list.
+      setCompanies(
+        [...(data ?? [])].sort((a, b) => Number(!!b.online) - Number(!!a.online)),
+      );
     } catch {
     } finally {
       setLoading(false);
@@ -538,6 +585,17 @@ function CompaniesListScreen({ onBack }: { onBack: () => void }) {
 
   const pinnedCompanies = companies.filter((c) => !!c.lat && !!c.lng);
 
+  /**
+   * The nearer of the firm's two places. The server measures from the office;
+   * a firm sharing its live position may be much closer than that right now,
+   * and the number on its card should say so.
+   */
+  const nearestKm = (c: CompanyProfile): number | undefined => {
+    const live = isLive(c) && center ? distanceKm(center, { lat: c.live_lat!, lng: c.live_lng! }) : null;
+    if (live == null) return c.distance_km;
+    return c.distance_km == null ? live : Math.min(c.distance_km, live);
+  };
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <Header title={t('customer.companies')} large back onBack={onBack} />
@@ -561,12 +619,23 @@ function CompaniesListScreen({ onBack }: { onBack: () => void }) {
               point={center}
               height={200}
               radiusKm={radiusKm}
-              markers={pinnedCompanies.map((c) => ({
-                lat: c.lat,
-                lng: c.lng,
-                hint: c.name,
-                color: 'success' as const,
-              }))}
+              markers={[
+                ...pinnedCompanies.map((c) => ({
+                  lat: c.lat,
+                  lng: c.lng,
+                  hint: c.name,
+                  color: 'success' as const,
+                })),
+                // A firm out on the road is also where its phone is now —
+                // in amber, so it reads as "this firm, right now", not a
+                // second office.
+                ...companies.filter(isLive).map((c) => ({
+                  lat: c.live_lat!,
+                  lng: c.live_lng!,
+                  hint: `${c.name} · ${t('live.hereNow')}`,
+                  color: 'warning' as const,
+                })),
+              ]}
               caption={`${pinnedCompanies.length} ${t('customer.companies').toLowerCase()}`}
             />
           </View>
@@ -591,11 +660,12 @@ function CompaniesListScreen({ onBack }: { onBack: () => void }) {
                   key={c.id}
                   name={c.name}
                   meta={[serviceLine(c), c.address].filter(Boolean).join(' · ')}
-                  distanceKm={c.distance_km}
+                  distanceKm={nearestKm(c)}
                   rating={c.rating}
                   count={c.ratings_count}
                   online={c.online}
                   imageUrl={c.avatar_url}
+                  badge={isLive(c) ? t('live.comesToYou') : undefined}
                   onPress={() => router.push({ pathname: '/company/[id]', params: { id: c.id } })}
                 />
               ))}
@@ -952,6 +1022,15 @@ const styles = StyleSheet.create({
   },
   cardName: { textAlign: 'center' },
   cardMeta: { textAlign: 'center', minHeight: 32 },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    maxWidth: '100%',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.pill,
+  },
   distance: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Alert,
   Linking,
@@ -17,7 +17,7 @@ import { Row, Section } from '@/components/ui/list';
 import { PhotoSlider } from '@/components/ui/photo-slider';
 import { Screen } from '@/components/ui/screen';
 import { YandexMap } from '@/components/yandex-map';
-import { Layout, Type } from '@/constants/theme';
+import { Layout, Radius, Squircle, Type } from '@/constants/theme';
 import { useCategories } from '@/hooks/use-categories';
 import { useRefresh } from '@/hooks/use-refresh';
 import { useTheme } from '@/hooks/use-theme';
@@ -27,8 +27,9 @@ import { categoryName, formatSom, telUrl } from '@/lib/format';
 import { hasCoords } from '@/lib/maps';
 import type { Order } from '@/lib/types';
 import { useAuth } from '@/store/auth';
+import { usePollOrder } from '@/store/realtime';
 
-import { Icon } from '@/components/ui/icon';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 export default function OrderDetailScreen() {
   const t = useT();
@@ -39,22 +40,18 @@ export default function OrderDetailScreen() {
   const { byId } = useCategories();
   const { user } = useAuth();
 
-  const [order, setOrder] = useState<Order | null>(null);
+  /**
+   * Live, not read once.
+   *
+   * The screen used to fetch the order on open and never again, so a customer
+   * watching their search saw nothing happen when a worker took it, turned it
+   * down or dropped it — the one moment they were waiting for. The poll hook
+   * re-reads on every order event from the socket (and on a timer while the
+   * socket is down).
+   */
+  const { order, refetch } = usePollOrder(id ?? null);
+  const load = refetch;
   const [busy, setBusy] = useState(false);
-
-  const load = useCallback(async () => {
-    if (!id) return;
-    try {
-      const o = await api.get<Order>(`/orders/${id}`);
-      setOrder(o);
-    } catch {
-      // ignore
-    }
-  }, [id]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const { refreshControl } = useRefresh(load);
 
@@ -82,12 +79,49 @@ export default function OrderDetailScreen() {
     try {
       await api.post<Order>(`/orders/${order.id}/cancel`);
       await load();
-    } catch {
-      // ignore — the row will catch up on the next read
+    } catch (err) {
+      // Said out loud: a cancel that silently did nothing left the customer
+      // believing the order was gone while it was still out there.
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('common.genericError'));
     } finally {
       setBusy(false);
     }
   };
+
+  /**
+   * A fresh order to every nearby worker, carrying the same job.
+   *
+   * For an order that was aimed at one worker who said no, or one a worker
+   * accepted and then dropped. `dispatch` re-opens the *same* order to the
+   * same audience — for a hand-picked order that is the very person who just
+   * declined — so the way to "anybody else" is a new broadcast with the same
+   * details, and the closed one stays in the history as what happened.
+   */
+  const sendToAll = async () => {
+    setBusy(true);
+    try {
+      const next = await api.post<Order>('/orders', {
+        category_id: order.category_id,
+        gender: order.gender,
+        description: order.description,
+        images: order.images,
+        phone: order.customer_phone,
+        price: order.price,
+        lat: order.lat,
+        lng: order.lng,
+      });
+      router.replace({ pathname: '/orders/[id]', params: { id: next.id } });
+    } catch (err) {
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('common.genericError'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Back to the list of nearby workers, to choose somebody by hand. */
+  const pickOther = () => router.navigate({ pathname: '/', params: { panel: 'workers' } });
+  /** Back to the firms list — the way on from a firm that said no. */
+  const pickOtherFirm = () => router.navigate({ pathname: '/', params: { panel: 'companies' } });
 
   /** Re-open the broadcast: every nearby worker is rung again. */
   const searchAgain = async () => {
@@ -113,6 +147,40 @@ export default function OrderDetailScreen() {
   // only they can declare the work finished.
   const isCustomer = order.customer_id === user?.id;
   const isCompanyOrder = !!order.company_id;
+
+  /**
+   * A worker took the job and then let it go.
+   *
+   * The customer has no cancel button once a job is accepted (theirs is "Ish
+   * tugadi"), so a cancelled order that still names a worker was dropped from
+   * the worker's side. It used to read exactly like the customer's own
+   * cancellation, and offered to ask the same audience again.
+   */
+  const droppedByWorker = order.status === 'cancelled' && !!order.worker_id;
+  const notified = order.invited_worker_ids?.length ?? 0;
+
+  const firmRecover = (
+    <Button label={t('company.pickOther')} icon="business" onPress={pickOtherFirm} />
+  );
+
+  /** Two ways forward once nobody is going to come: everyone, or somebody chosen. */
+  const recover = (primary: 'all' | 'again') => (
+    <View style={styles.footerStack}>
+      <Button
+        label={primary === 'all' ? t('outcome.sendToAll') : t('waiting.tryAgain')}
+        icon={primary === 'all' ? 'paper-plane' : 'refresh'}
+        onPress={primary === 'all' ? sendToAll : searchAgain}
+        loading={busy}
+      />
+      <Button
+        label={t('outcome.pickOther')}
+        icon="people"
+        variant="gray"
+        onPress={pickOther}
+        disabled={busy}
+      />
+    </View>
+  );
 
   const action = (() => {
     if (!isCustomer) {
@@ -151,7 +219,9 @@ export default function OrderDetailScreen() {
       case 'invited':
       case 'matching':
         // The search runs on the server; the only useful action is to stop it.
-        return isCompanyOrder && order.status === 'pending' ? null : (
+        // A firm's order too: it has no clock, so without this a firm that
+        // never answered kept the customer waiting on it indefinitely.
+        return (
           <Button
             label={t('waiting.cancel')}
             icon="close"
@@ -160,14 +230,15 @@ export default function OrderDetailScreen() {
             loading={busy}
           />
         );
-      case 'expired':
-      case 'cancelled':
-      // Declined by everyone it was aimed at. Re-opening clears the record of
-      // who said no, so "try again" genuinely asks them again — which is what
-      // the customer means when the answer might have been "not right now".
+      // Turned down, or taken and dropped: asking the same audience again
+      // would ring the worker who just said no, so the way forward is everyone
+      // else — or somebody the customer picks.
       case 'rejected':
-        // Nobody took it — one tap puts it back in front of every worker.
-        return isCompanyOrder ? null : (
+        return isCompanyOrder ? firmRecover : recover('all');
+      case 'cancelled':
+        if (isCompanyOrder) return firmRecover;
+        if (droppedByWorker) return recover('all');
+        return (
           <Button
             label={t('waiting.tryAgain')}
             icon="refresh"
@@ -175,6 +246,10 @@ export default function OrderDetailScreen() {
             loading={busy}
           />
         );
+      // The window ran out. Re-opening it is the right first move — a worker
+      // may simply have been busy — with choosing by hand beside it.
+      case 'expired':
+        return isCompanyOrder ? firmRecover : recover('again');
       case 'accepted':
       case 'in_progress':
         return (
@@ -211,6 +286,15 @@ export default function OrderDetailScreen() {
         </Text>
         <StatusPill status={order.status} />
       </View>
+
+      {isCustomer ? (
+        <OutcomeBanner
+          order={order}
+          droppedByWorker={droppedByWorker}
+          notified={notified}
+          isCompanyOrder={isCompanyOrder}
+        />
+      ) : null}
 
       <Section
         header={t('order.detailsTitle')}
@@ -266,7 +350,155 @@ export default function OrderDetailScreen() {
   );
 }
 
+/* ===================== What is happening, in words ===================== */
+
+/**
+ * The line a status pill cannot carry: what just happened to this order and
+ * what the customer can do about it. Shown while the search runs and once it
+ * has ended without a worker; nothing for the states that explain themselves.
+ */
+function OutcomeBanner({
+  order,
+  droppedByWorker,
+  notified,
+  isCompanyOrder,
+}: {
+  order: Order;
+  droppedByWorker: boolean;
+  notified: number;
+  isCompanyOrder: boolean;
+}) {
+  const t = useT();
+  const theme = useTheme();
+
+  const content = ((): { icon: IconName; tone: 'danger' | 'warning' | 'primary'; title: string; body: string } | null => {
+    // A firm's order is addressed to one firm and has no search behind it, so
+    // it has its own three things to say.
+    if (isCompanyOrder) {
+      switch (order.status) {
+        case 'pending':
+          return {
+            icon: 'hourglass',
+            tone: 'primary',
+            title: t('outcome.companyWaitingTitle'),
+            body: t('outcome.companyWaitingBody'),
+          };
+        case 'rejected':
+          return {
+            icon: 'close-circle',
+            tone: 'danger',
+            title: t('outcome.companyRejectedTitle'),
+            body: t('outcome.companyRejectedBody'),
+          };
+        case 'cancelled':
+        case 'expired':
+          return {
+            icon: 'warning',
+            tone: 'warning',
+            title: t('outcome.companyCancelledTitle'),
+            body: t('outcome.companyCancelledBody'),
+          };
+        default:
+          return null;
+      }
+    }
+    switch (order.status) {
+      case 'matching':
+      case 'invited':
+        // Nobody was in range when it went out. The search keeps running to the
+        // end of its window, and a worker who comes online inside it is offered
+        // the job — so this is "not yet", not "no".
+        return notified === 0
+          ? {
+              icon: 'hourglass',
+              tone: 'warning',
+              title: t('outcome.noneYetTitle'),
+              body: t('outcome.noneYetBody'),
+            }
+          : {
+              icon: 'paper-plane',
+              tone: 'primary',
+              title: t('outcome.sentTitle', { n: notified }),
+              body: t('outcome.sentBody'),
+            };
+      case 'rejected':
+        return {
+          icon: 'close-circle',
+          tone: 'danger',
+          title: t('outcome.rejectedTitle'),
+          body: t('outcome.rejectedBody'),
+        };
+      case 'cancelled':
+        return droppedByWorker
+          ? {
+              icon: 'warning',
+              tone: 'danger',
+              title: t('outcome.droppedTitle'),
+              body: t('outcome.droppedBody'),
+            }
+          : null;
+      case 'expired':
+        return notified === 0
+          ? {
+              icon: 'location',
+              tone: 'warning',
+              title: t('outcome.noWorkersTitle'),
+              body: t('outcome.noWorkersBody'),
+            }
+          : {
+              icon: 'time',
+              tone: 'warning',
+              title: t('outcome.noAnswerTitle'),
+              body: t('outcome.noAnswerBody', { n: notified }),
+            };
+      default:
+        return null;
+    }
+  })();
+
+  if (!content) return null;
+
+  const tint =
+    content.tone === 'danger' ? theme.danger : content.tone === 'warning' ? theme.warning : theme.primary;
+  const wash =
+    content.tone === 'danger'
+      ? theme.dangerSoft
+      : content.tone === 'warning'
+        ? theme.warningSoft
+        : theme.primarySoft;
+
+  return (
+    <View style={[styles.banner, Squircle, { backgroundColor: wash }]}>
+      <View style={[styles.bannerGlyph, { backgroundColor: theme.surface }]}>
+        <Icon name={content.icon} size={22} color={tint} />
+      </View>
+      <View style={styles.bannerText}>
+        <Text style={[Type.subheadEmphasized, { color: theme.text }]}>{content.title}</Text>
+        <Text style={[Type.footnote, { color: theme.textSecondary }]}>{content.body}</Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  footerStack: { gap: 8 },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginHorizontal: Layout.gutter,
+    marginBottom: 24,
+    padding: 14,
+    borderRadius: Radius.lg,
+  },
+  bannerGlyph: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerText: { flex: 1, gap: 3 },
   head: {
     flexDirection: 'row',
     alignItems: 'center',

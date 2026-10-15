@@ -1,17 +1,20 @@
 import { Stack, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { CardPaymentHost } from '@/components/card-payment-host';
 import { useTheme } from '@/hooks/use-theme';
+import { useLiveLocation } from '@/hooks/use-live-location';
+import { setLiveLocation } from '@/lib/company-live';
+import { useT } from '@/i18n';
 import {
   consumeColdStartTap,
+  presentLocalNotification,
   onNotificationTap,
   startPushRegistration,
   type NotificationTap,
 } from '@/lib/notifications';
 import { api } from '@/lib/api';
 import { useAuth } from '@/store/auth';
-import { getCoordsWithFallback } from '@/lib/location';
 import { OrderFlowProvider } from '@/store/order-flow';
 import { useInviteAlerts, useNotificationBridge } from '@/store/realtime';
 
@@ -60,17 +63,21 @@ export default function AppLayout() {
   // is noticed from another screen — no takeover, just a notification.
   useInviteAlerts(!!user?.worker_profile && !user.worker_profile.banned);
 
-  // Auto-online: when the user enters the app with worker or company mode,
-  // automatically set them online.
+  // The worker's location, for every worker screen — see WorkerLocationGuard.
+  const isWorker = activeMode === 'worker' && !!user?.worker_profile;
+  const isCompany = activeMode === 'company' && !!user?.company_profile;
+
+  // Auto-online for firms: entering company mode puts the firm online.
+  //
+  // Workers are deliberately left out. Going online is the worker's own
+  // decision — it means their phone starts ringing with jobs — and switching
+  // them on behind their back undid the toggle: a worker who went offline was
+  // put straight back online the next time they opened the app.
   useEffect(() => {
     if (!user) return;
     (async () => {
       try {
-        if (activeMode === 'worker' && user.worker_profile && !user.worker_profile.online) {
-          const coords = await getCoordsWithFallback();
-          await api.post('/worker/status', { online: true, lat: coords.lat, lng: coords.lng });
-          refreshMe();
-        } else if (activeMode === 'company' && user.company_profile && !user.company_profile.online) {
+        if (activeMode === 'company' && user.company_profile && !user.company_profile.online) {
           await api.post('/company/status', { online: true });
           refreshMe();
         }
@@ -101,9 +108,104 @@ export default function AppLayout() {
           to put the card and SMS-code steps on screen, so no screen that buys
           something has to know they exist. */}
       <CardPaymentHost />
+      {isWorker ? <WorkerLocationGuard /> : null}
+      {isCompany ? <CompanyLiveGuard /> : null}
       {/* Incoming jobs are not a takeover any more — they land as cards in the
           worker's list (see components/incoming-order-card.tsx); the push
           notification is what gets attention. */}
     </OrderFlowProvider>
   );
+}
+
+/**
+ * Keeps a worker's location true for as long as they are signed in as one.
+ *
+ * Lives here rather than on the worker's home screen so it keeps running on
+ * every worker screen (orders, wallet, profile), not only the one with the
+ * switch on it.
+ *
+ *   - While online, each move is reported with the same status call that put
+ *     the worker online, so dispatch measures "near" from where they are now.
+ *   - If location is switched off, or permission taken away, while online, the
+ *     worker is taken offline at once rather than left "online" at the last
+ *     place the app saw them — and told, in the tray as well as on screen,
+ *     since the switch is usually flipped from quick settings with this app in
+ *     the background. Once per lapse: it re-arms when location is back.
+ */
+function WorkerLocationGuard() {
+  const t = useT();
+  const { user, refreshMe } = useAuth();
+  const online = !!user?.worker_profile?.online;
+
+  const { status } = useLiveLocation({
+    tracking: online,
+    onMove: (fix) => {
+      api.post('/worker/status', { online: true, lat: fix.lat, lng: fix.lng }).catch(() => {});
+    },
+  });
+  const blocked = status !== 'ok' && status !== 'checking';
+
+  const lapseRef = useRef(false);
+  useEffect(() => {
+    if (!blocked) {
+      lapseRef.current = false;
+      return;
+    }
+    if (!online || lapseRef.current) return;
+    lapseRef.current = true;
+    api
+      .post('/worker/status', { online: false })
+      .then(() => refreshMe())
+      .catch(() => {});
+    presentLocalNotification({
+      title: t('loc.lostTitle'),
+      body: t('loc.lostBody'),
+      data: { type: 'location.lost' },
+    });
+  }, [blocked, online, refreshMe, t]);
+
+  return null;
+}
+
+/**
+ * A mobile firm's live position, for every firm screen.
+ *
+ * Reports where the phone is while the firm is online with live location on.
+ * If location goes away, live location is switched off rather than left
+ * pointing at the last place the phone was seen — the firm stays online, and
+ * keeps getting orders around its office, and is told exactly that.
+ */
+function CompanyLiveGuard() {
+  const t = useT();
+  const { user, refreshMe } = useAuth();
+  const firm = user?.company_profile;
+  const sharing = !!firm?.online && !!firm?.live_location;
+
+  const { status } = useLiveLocation({
+    tracking: sharing,
+    onMove: (fix) => {
+      setLiveLocation(true, fix).catch(() => {});
+    },
+  });
+  const blocked = status !== 'ok' && status !== 'checking';
+
+  const lapseRef = useRef(false);
+  useEffect(() => {
+    if (!blocked) {
+      lapseRef.current = false;
+      return;
+    }
+    if (!sharing || lapseRef.current) return;
+    lapseRef.current = true;
+    setLiveLocation(false)
+      .then(() => refreshMe())
+      .catch(() => {});
+    presentLocalNotification({
+      title: t('live.lostTitle'),
+      body: t('live.lostBody'),
+      data: { type: 'location.lost' },
+    });
+  }, [blocked, sharing, refreshMe, t]);
+
+  return null;
 }

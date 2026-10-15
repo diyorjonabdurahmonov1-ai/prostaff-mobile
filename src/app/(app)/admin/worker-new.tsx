@@ -70,7 +70,9 @@ export default function AdminWorkerNewScreen() {
   const [experience, setExperience] = useState('');
   const [address, setAddress] = useState('');
   const [credit, setCredit] = useState(true);
-  const [online, setOnline] = useState(true);
+  // Off by default: a new worker goes online themselves, from their own panel,
+  // once they are actually ready to take a job.
+  const [online, setOnline] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

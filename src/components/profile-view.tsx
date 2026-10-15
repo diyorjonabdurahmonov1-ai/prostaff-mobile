@@ -137,10 +137,11 @@ export function ProfileView({ children }: ProfileViewProps) {
    */
   const company = activeMode === 'company' ? (user?.company_profile ?? null) : null;
 
+  /** Signed in as a worker right now, not merely entitled to be. */
+  const isWorker = activeMode === 'worker' && !!user?.worker_profile;
+
   /** Signed in as a worker or a firm right now, not merely entitled to be. */
-  const isProvider =
-    (activeMode === 'worker' && !!user?.worker_profile) ||
-    (activeMode === 'company' && !!user?.company_profile);
+  const isProvider = isWorker || (activeMode === 'company' && !!user?.company_profile);
 
   return (
     <>
@@ -171,7 +172,9 @@ export function ProfileView({ children }: ProfileViewProps) {
         </PressableScale>
       </Section>
 
-      {/* The account card: months for a firm, a balance for everybody else. */}
+      {/* The account card: months for a firm, a balance for a worker, and
+          nothing for a customer — a customer pays per job and has no balance
+          to look after, so the card was only ever a dead end on their tab. */}
       {company ? (
         <PressableScale
           onPress={() => router.push('/company/subscription')}
@@ -215,7 +218,7 @@ export function ProfileView({ children }: ProfileViewProps) {
             </View>
           </LinearGradient>
         </PressableScale>
-      ) : (
+      ) : isWorker ? (
         <PressableScale
           onPress={() => router.push('/wallet')}
           scaleTo={0.975}
@@ -241,7 +244,7 @@ export function ProfileView({ children }: ProfileViewProps) {
             </View>
           </LinearGradient>
         </PressableScale>
-      )}
+      ) : null}
 
       {/* Whoever is signed in, their own record goes here. */}
       {children}

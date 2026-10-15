@@ -19,6 +19,7 @@ import { EmptyState, LoadingState } from '@/components/ui/empty-state';
 import { Header } from '@/components/ui/header';
 import { Section } from '@/components/ui/list';
 import { Segmented } from '@/components/ui/segmented';
+import { Sheet } from '@/components/ui/sheet';
 import { YandexMap } from '@/components/yandex-map';
 import { Layout, Radius, Squircle, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -81,13 +82,17 @@ export default function CompanyOrdersScreen() {
     }
   };
 
-  /** One job at a time: a firm on an active order takes nothing new. */
-  const busy = active.length > 0;
+  // A firm is a team and may hold several jobs at once — see the panel.
   const list = tab === 'new' ? pending : tab === 'active' ? active : done;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
-      <Header title={t('tab.orders')} large back subtitle={`${orders.length} ta`} />
+      <Header
+        title={t('tab.orders')}
+        large
+        back
+        subtitle={t('company.ordersCount', { n: orders.length })}
+      />
 
       <View style={styles.controls}>
         <Segmented<Tab>
@@ -117,21 +122,15 @@ export default function CompanyOrdersScreen() {
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-          {tab === 'new' && busy ? (
-            <Text style={[Type.footnote, styles.notice, { color: theme.textSecondary }]}>
-              {t('order.busyWorker')}
-            </Text>
-          ) : null}
-
           {list.map((order) => (
             <CompanyOrderCard
               key={order.id}
               order={order}
               answerable={tab === 'new'}
-              busy={busy}
               responding={respondingId === order.id}
               onAccept={() => respond(order, 'accept')}
               onReject={() => respond(order, 'reject')}
+              onEnded={() => Promise.all([refresh(), refreshMe()])}
               // A firm reads its own jobs from the provider's side — the whole
               // brief and who placed it — not from the customer's order screen.
               onOpen={() => router.push({ pathname: '/work/[id]', params: { id: order.id } })}
@@ -148,28 +147,53 @@ export default function CompanyOrdersScreen() {
 function CompanyOrderCard({
   order,
   answerable,
-  busy,
   responding,
   onAccept,
   onReject,
   onOpen,
+  onEnded,
 }: {
   order: Order;
   answerable: boolean;
-  busy: boolean;
   responding: boolean;
   onAccept: () => void;
   onReject: () => void;
   onOpen: () => void;
+  onEnded: () => Promise<unknown>;
 }) {
   const t = useT();
   const theme = useTheme();
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  /**
+   * The firm's way out of a job it holds.
+   *
+   * Only the customer can mark a firm's job finished, so a customer who never
+   * tapped "Ish tugadi" used to leave the job — and the firm — stuck on it for
+   * good. The API has always let the provider cancel; this card now offers it.
+   */
+  const cancelJob = async () => {
+    setCancelling(true);
+    try {
+      await api.post(`/orders/${order.id}/cancel`);
+      setConfirmCancel(false);
+      await onEnded();
+    } catch (err) {
+      setConfirmCancel(false);
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('common.genericError'));
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const holding = order.status === 'accepted' || order.status === 'in_progress';
   // The customer's number is the firm's to use while the job is theirs — and a
   // map is only worth its space for a job somebody still has to drive to.
   const showPhone = holding && !!order.customer_phone;
-  const showMap = holding && hasCoords(order);
+  // An unanswered job shows where it is too: whether the firm can get there is
+  // half of whether it should accept.
+  const showMap = (holding || answerable) && hasCoords(order);
 
   return (
     <Section inset={Layout.gutter} style={styles.card}>
@@ -210,7 +234,7 @@ function CompanyOrderCard({
           <YandexMap
             point={{ lat: order.lat, lng: order.lng }}
             height={150}
-            route
+            route={holding}
             caption={t('order.location')}
           />
         ) : null}
@@ -244,7 +268,6 @@ function CompanyOrderCard({
               label={t('company.acceptOrder')}
               icon="checkmark"
               loading={responding}
-              disabled={busy}
               onPress={onAccept}
             />
             <Button
@@ -255,7 +278,42 @@ function CompanyOrderCard({
             />
           </View>
         ) : null}
+
+        {holding ? (
+          <Button
+            label={t('job.cancel')}
+            icon="close"
+            variant="gray"
+            size="sm"
+            onPress={() => setConfirmCancel(true)}
+            disabled={cancelling}
+          />
+        ) : null}
       </Pressable>
+
+      <Sheet
+        visible={confirmCancel}
+        onClose={() => !cancelling && setConfirmCancel(false)}
+        title={t('job.areYouSure')}
+        message={t('job.cancelConfirm')}
+        footer={
+          <>
+            <Button
+              label={t('job.yesCancel')}
+              icon="close"
+              variant="danger"
+              loading={cancelling}
+              onPress={cancelJob}
+            />
+            <Button
+              label={t('job.no')}
+              variant="gray"
+              disabled={cancelling}
+              onPress={() => setConfirmCancel(false)}
+            />
+          </>
+        }
+      />
     </Section>
   );
 }
