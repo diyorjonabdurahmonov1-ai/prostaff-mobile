@@ -132,10 +132,17 @@ export default function DetailsScreen() {
     }
   };
 
+  /**
+   * The address has to be the customer's own: found by GPS, or put on the map
+   * by hand. The form used to go ahead on central Tashkent when location was
+   * refused, so the order rang workers around the city centre for a job that
+   * was somewhere else entirely — and nobody near the customer ever heard it.
+   */
   const canContinue =
     draft.description.trim().length > 0 &&
     draft.phone.trim().length > 0 &&
-    Number(draft.price) > 0;
+    Number(draft.price) > 0 &&
+    draft.locationResolved;
 
   return (
     <Screen
@@ -296,8 +303,17 @@ export default function DetailsScreen() {
             onPress={() => setPickerOpen(true)}
           />
           <View style={styles.locationRow}>
-            <Text style={[Type.footnote, styles.locationHint, { color: theme.textSecondary }]}>
-              {draft.locationResolved ? t('order.locationReady') : t('order.useDefaultLocation')}
+            <Text
+              style={[
+                Type.footnote,
+                styles.locationHint,
+                { color: draft.locationResolved ? theme.textSecondary : theme.danger },
+              ]}>
+              {draft.locationResolved
+                ? t('order.locationReady')
+                : locating
+                  ? t('order.locationDetecting')
+                  : t('order.locationNeeded')}
             </Text>
             <Button
               label={locating ? t('order.locationDetecting') : t('order.detectLocation')}
