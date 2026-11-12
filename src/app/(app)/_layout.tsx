@@ -5,6 +5,7 @@ import { CardPaymentHost } from '@/components/card-payment-host';
 import { useTheme } from '@/hooks/use-theme';
 import { useLiveLocation } from '@/hooks/use-live-location';
 import { setLiveLocation } from '@/lib/company-live';
+import { firmMayReport, setFirmLiveIntent, setWorkerIntent, workerMayReport } from '@/lib/presence';
 import { useT } from '@/i18n';
 import {
   consumeColdStartTap,
@@ -17,6 +18,10 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/store/auth';
 import { OrderFlowProvider } from '@/store/order-flow';
 import { useInviteAlerts, useNotificationBridge } from '@/store/realtime';
+
+/** How often, and how many times, a failed "go offline" is retried. */
+const LAPSE_RETRY_MS = 15_000;
+const LAPSE_RETRIES = 3;
 
 export default function AppLayout() {
   const theme = useTheme();
@@ -140,6 +145,8 @@ function WorkerLocationGuard() {
   const { status } = useLiveLocation({
     tracking: online,
     onMove: (fix) => {
+      // Not if the worker has just asked to go offline — see lib/presence.
+      if (!workerMayReport()) return;
       api.post('/worker/status', { online: true, lat: fix.lat, lng: fix.lng }).catch(() => {});
     },
   });
@@ -153,15 +160,26 @@ function WorkerLocationGuard() {
     }
     if (!online || lapseRef.current) return;
     lapseRef.current = true;
-    api
-      .post('/worker/status', { online: false })
-      .then(() => refreshMe())
-      .catch(() => {});
+    setWorkerIntent(false);
+    // Location is usually lost somewhere with poor signal, so this is tried a
+    // few times: a worker left "online" with no location is the one state
+    // this guard exists to prevent.
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const goOffline = (attempt: number) => {
+      api
+        .post('/worker/status', { online: false })
+        .then(() => refreshMe())
+        .catch(() => {
+          if (attempt < LAPSE_RETRIES) timers.push(setTimeout(() => goOffline(attempt + 1), LAPSE_RETRY_MS));
+        });
+    };
+    goOffline(0);
     presentLocalNotification({
       title: t('loc.lostTitle'),
       body: t('loc.lostBody'),
       data: { type: 'location.lost' },
     });
+    return () => timers.forEach(clearTimeout);
   }, [blocked, online, refreshMe, t]);
 
   return null;
@@ -184,6 +202,8 @@ function CompanyLiveGuard() {
   const { status } = useLiveLocation({
     tracking: sharing,
     onMove: (fix) => {
+      // Not if the firm has just switched live location off — see lib/presence.
+      if (!firmMayReport()) return;
       setLiveLocation(true, fix).catch(() => {});
     },
   });
@@ -197,6 +217,7 @@ function CompanyLiveGuard() {
     }
     if (!sharing || lapseRef.current) return;
     lapseRef.current = true;
+    setFirmLiveIntent(false);
     setLiveLocation(false)
       .then(() => refreshMe())
       .catch(() => {});

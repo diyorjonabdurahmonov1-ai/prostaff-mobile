@@ -34,8 +34,20 @@ export function slotOf(order: Order): Slot {
   if (FOUND.includes(order.status)) return 'found';
   if (SEARCHING.includes(order.status)) return 'searching';
   if (order.status === 'cancelled' && !order.worker_id) return 'withdrawn';
+  // The customer chose to start without this place (see `startWithFound`).
+  if (givenUp.has(order.id)) return 'withdrawn';
   return 'missing';
 }
+
+/**
+ * Places the customer gave up on by starting with the workers found.
+ *
+ * A place that had already expired cannot be cancelled on every server, so it
+ * would go on counting as "not found" and the card would keep offering to
+ * start, again and again, after the customer already had. Remembered for the
+ * session; the server's own state takes over wherever it does record it.
+ */
+const givenUp = new Set<string>();
 
 /**
  * Whether two orders came out of the same request.
@@ -125,6 +137,7 @@ export async function startWithFound(orders: Order[]): Promise<number> {
   if (batchId) {
     try {
       await api.post(`/orders/batch/${batchId}/start`);
+      for (const o of orders) if (slotOf(o) === 'missing') givenUp.add(o.id);
       return 0;
     } catch (err) {
       if (!(err instanceof ApiError && err.status === 404)) throw err;
@@ -132,6 +145,7 @@ export async function startWithFound(orders: Order[]): Promise<number> {
   }
   const open = orders.filter((o) => slotOf(o) === 'searching' || o.status === 'expired');
   const results = await Promise.allSettled(open.map((o) => api.post(`/orders/${o.id}/cancel`)));
+  for (const o of orders) if (slotOf(o) === 'missing') givenUp.add(o.id);
   // An expired order may already be closed for good; only a search that keeps
   // running is a failure worth reporting.
   return results.filter((r, i) => r.status === 'rejected' && slotOf(open[i]) === 'searching').length;

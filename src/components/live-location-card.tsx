@@ -23,6 +23,7 @@ import { getPreciseFix, useLiveLocation } from '@/hooks/use-live-location';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { minutesSince, setLiveLocation } from '@/lib/company-live';
+import { setFirmLiveIntent } from '@/lib/presence';
 import type { CompanyProfile } from '@/lib/types';
 
 export function LiveLocationCard({
@@ -47,13 +48,17 @@ export function LiveLocationCard({
   const toggle = async (next: boolean) => {
     if (busy) return;
     setBusy(true);
+    // Recorded first, so a position report already on its way cannot switch
+    // live location back on behind this tap (see lib/presence).
+    setFirmLiveIntent(next);
     try {
       if (next) {
-        // Switching on needs a real position to start from; without one the
-        // tap asks for location instead of pretending.
-        const fix = await getPreciseFix();
+        // Switching on needs a real position to start from. Without one the
+        // tap asks for location, and carries on if the firm grants it.
+        let fix = await getPreciseFix();
+        if (!fix && (await location.fix()) === 'ok') fix = await getPreciseFix();
         if (!fix) {
-          await location.fix();
+          setFirmLiveIntent(null);
           return;
         }
         await setLiveLocation(true, fix);
@@ -62,6 +67,7 @@ export function LiveLocationCard({
       }
       await onChanged();
     } catch (err) {
+      setFirmLiveIntent(null);
       Alert.alert(t('common.error'), err instanceof Error && err.message ? err.message : t('common.genericError'));
     } finally {
       setBusy(false);

@@ -83,14 +83,16 @@ export function OnlineCompaniesCarousel() {
       const data = await api.get<CompanyProfile[]>(
         `/companies?lat=${lat}&lng=${lng}&radius_km=${RADIUS_KM}`,
       );
-      setFirms(
-        (data ?? [])
-          .filter((c) => c.online && !c.banned)
-          // Best-rated first; a firm with no reviews yet is not punished for
-          // being new, it just waits behind the ones customers vouched for.
-          .sort((a, b) => b.rating - a.rating || b.ratings_count - a.ratings_count)
-          .slice(0, MAX_FIRMS),
-      );
+      const next = (data ?? [])
+        .filter((c) => c.online && !c.banned)
+        // Best-rated first; a firm with no reviews yet is not punished for
+        // being new, it just waits behind the ones customers vouched for.
+        .sort((a, b) => b.rating - a.rating || b.ratings_count - a.ratings_count)
+        .slice(0, MAX_FIRMS);
+      setFirms(next);
+      // Firms go offline between visits: keep the front card inside the list,
+      // or no card is "front" and a tap on any of them only scrolls.
+      setActive((prev) => Math.min(prev, Math.max(0, next.length - 1)));
     } catch {
       // A showcase that fails to load is simply not shown.
     } finally {
@@ -173,8 +175,10 @@ export function OnlineCompaniesCarousel() {
             onScrollBeginDrag={() => {
               touchedAt.current = Date.now();
             }}
+            // Settling is not a touch: this also fires when the shelf turns by
+            // itself, and counting it as one made autoplay wait out the pause
+            // after every turn it made.
             onMomentumScrollEnd={(e) => {
-              touchedAt.current = Date.now();
               setActive(Math.round(e.nativeEvent.contentOffset.x / interval));
             }}
             contentContainerStyle={{ paddingHorizontal: sideInset, gap: CARD_GAP }}

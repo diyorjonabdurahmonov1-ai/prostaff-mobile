@@ -31,6 +31,9 @@ import { usePollOrder } from '@/store/realtime';
 
 import { Icon, type IconName } from '@/components/ui/icon';
 
+/** A stable empty list: no status stops the poll (see the hook call below). */
+const KEEP_POLLING: Order['status'][] = [];
+
 export default function OrderDetailScreen() {
   const t = useT();
   const { lang } = useI18n();
@@ -49,7 +52,10 @@ export default function OrderDetailScreen() {
    * re-reads on every order event from the socket (and on a timer while the
    * socket is down).
    */
-  const { order, refetch } = usePollOrder(id ?? null);
+  // Never "settled": an order that ended can be re-opened from this screen
+  // ("Qaytadan qidirish"), and a poll that had stopped for good would leave it
+  // reading "searching" for ever while the socket is down.
+  const { order, refetch } = usePollOrder(id ?? null, { stopWhen: KEEP_POLLING });
   const load = refetch;
   const [busy, setBusy] = useState(false);
 
@@ -69,6 +75,8 @@ export default function OrderDetailScreen() {
     try {
       await api.post<Order>(`/orders/${order.id}/complete`);
       router.push({ pathname: '/rate', params: { orderId: order.id } });
+    } catch (err) {
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('common.genericError'));
     } finally {
       setBusy(false);
     }
