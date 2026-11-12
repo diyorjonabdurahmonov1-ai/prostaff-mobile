@@ -28,6 +28,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useT, type TranslationKey } from '@/i18n';
 import { api } from '@/lib/api';
 import { switchRoot } from '@/lib/nav';
+import { setWorkerIntent } from '@/lib/presence';
 import type { WorkerProfile } from '@/lib/types';
 import { useAuth } from '@/store/auth';
 import { useAlerts, useWorkerOrders } from '@/store/realtime';
@@ -118,18 +119,20 @@ export default function WorkerPanelScreen() {
 
   const setOnline = async (next: boolean) => {
     if (busy) return;
-    // No location, no online: the tap asks for it instead.
-    if (next && locationBlocked) {
-      await location.fix();
-      return;
-    }
+    // No location, no online: the tap asks for it — and carries on if the
+    // worker grants it, so one tap is enough.
+    if (next && locationBlocked && (await location.fix()) !== 'ok') return;
     setBusy(true);
     setPendingOnline(next);
+    // Recorded before the request, so a location report already on its way
+    // cannot put the worker back online behind this tap (see lib/presence).
+    setWorkerIntent(next);
     try {
       // A real fix or nothing. Going online at a guessed position would put the
       // worker in front of jobs across the city from where they stand.
       const coords = next ? await getPreciseFix() : null;
       if (next && !coords) {
+        setWorkerIntent(null);
         await location.refresh();
         Alert.alert(t('loc.noFixTitle'), t('loc.noFixBody'));
         return;
@@ -142,6 +145,7 @@ export default function WorkerPanelScreen() {
       await refreshMe();
     } catch (err) {
       // The switch goes back to what the server still has, and says why.
+      setWorkerIntent(null);
       Alert.alert(t('common.error'), err instanceof Error && err.message ? err.message : t('common.networkError'));
     } finally {
       setPendingOnline(null);
