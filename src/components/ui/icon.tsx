@@ -100,6 +100,23 @@ import { WifiHighIcon } from 'phosphor-react-native/src/icons/WifiHigh';
 import { WrenchIcon } from 'phosphor-react-native/src/icons/Wrench';
 import { XIcon } from 'phosphor-react-native/src/icons/X';
 import { XCircleIcon } from 'phosphor-react-native/src/icons/XCircle';
+import { PaintRollerIcon } from 'phosphor-react-native/src/icons/PaintRoller';
+import { CarIcon } from 'phosphor-react-native/src/icons/Car';
+import { DropIcon } from 'phosphor-react-native/src/icons/Drop';
+import { ScissorsIcon } from 'phosphor-react-native/src/icons/Scissors';
+import { BabyIcon } from 'phosphor-react-native/src/icons/Baby';
+import { GraduationCapIcon } from 'phosphor-react-native/src/icons/GraduationCap';
+import { LaptopIcon } from 'phosphor-react-native/src/icons/Laptop';
+import { CookingPotIcon } from 'phosphor-react-native/src/icons/CookingPot';
+import { CouchIcon } from 'phosphor-react-native/src/icons/Couch';
+import { SnowflakeIcon } from 'phosphor-react-native/src/icons/Snowflake';
+import { FireIcon } from 'phosphor-react-native/src/icons/Fire';
+import { GasPumpIcon } from 'phosphor-react-native/src/icons/GasPump';
+import { FirstAidIcon } from 'phosphor-react-native/src/icons/FirstAid';
+import { ToolboxIcon } from 'phosphor-react-native/src/icons/Toolbox';
+import { TShirtIcon } from 'phosphor-react-native/src/icons/TShirt';
+import { DogIcon } from 'phosphor-react-native/src/icons/Dog';
+import { HandshakeIcon } from 'phosphor-react-native/src/icons/Handshake';
 import type { Icon as PhosphorIcon, IconWeight } from 'phosphor-react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
@@ -158,6 +175,23 @@ const GLYPHS = {
   tree: TreeIcon,
   'spray-bottle': SprayBottleIcon,
   confetti: ConfettiIcon,
+  'paint-roller': PaintRollerIcon,
+  car: CarIcon,
+  drop: DropIcon,
+  scissors: ScissorsIcon,
+  baby: BabyIcon,
+  'graduation-cap': GraduationCapIcon,
+  laptop: LaptopIcon,
+  'cooking-pot': CookingPotIcon,
+  couch: CouchIcon,
+  snowflake: SnowflakeIcon,
+  fire: FireIcon,
+  'gas-pump': GasPumpIcon,
+  'first-aid': FirstAidIcon,
+  toolbox: ToolboxIcon,
+  tshirt: TShirtIcon,
+  dog: DogIcon,
+  handshake: HandshakeIcon,
   reader: ReceiptIcon,
   'reader-outline': ReceiptIcon,
   clipboard: ClipboardTextIcon,

@@ -17,6 +17,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useI18n, useT } from '@/i18n';
 import { categoryName, formatSom } from '@/lib/format';
 import { useAuth } from '@/store/auth';
+import { Backdrop } from '@/components/backdrop';
 
 /**
  * The worker's profile.
@@ -59,6 +60,7 @@ export default function WorkerProfileScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+      <Backdrop />
       <Header title={t('profile.title')} large back={false} />
 
       <ScrollView

@@ -1,5 +1,4 @@
 import Slider from '@react-native-community/slider';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -22,20 +21,26 @@ import { PressableScale } from '@/components/ui/pressable-scale';
 import { Row, Section } from '@/components/ui/list';
 import { Stars } from '@/components/ui/stars';
 import {
-  Gradients,
   Hairline,
   Layout,
   MaxContentWidth,
   Radius,
-  Shadow,
   Squircle,
   Type,
 } from '@/constants/theme';
+import { Backdrop } from '@/components/backdrop';
+import {
+  ActiveOrderCard,
+  EntryCards,
+  NearbyWorkers,
+  SearchPill,
+  ServicesGrid,
+} from '@/components/home-sections';
 import { OnlineCompaniesCarousel } from '@/components/online-companies-carousel';
 import { YandexMap } from '@/components/yandex-map';
 import { useCategories } from '@/hooks/use-categories';
 import { useRefresh } from '@/hooks/use-refresh';
-import { useTheme, useThemeMode } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useI18n, useT } from '@/i18n';
 import { api } from '@/lib/api';
 import { categoryName } from '@/lib/format';
@@ -46,7 +51,7 @@ import type { LatLng } from '@/lib/maps';
 import type { CompanyProfile, WorkerProfile } from '@/lib/types';
 import { useAuth } from '@/store/auth';
 
-import { Icon, type IconName } from '@/components/ui/icon';
+import { Icon } from '@/components/ui/icon';
 
 type Panel = 'home' | 'companies' | 'workers';
 
@@ -167,6 +172,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+      <Backdrop />
       <ScrollView
         contentContainerStyle={styles.scroll}
         contentInsetAdjustmentBehavior="automatic"
@@ -174,7 +180,7 @@ export default function HomeScreen() {
         {/* Greeting — caption over a large title, iOS style */}
         <View style={styles.greeting}>
           <View style={styles.greetingText}>
-            <Text style={[Type.subhead, { color: theme.textSecondary }]}>Salom,</Text>
+            <Text style={[Type.subhead, { color: theme.textSecondary }]}>{t('home.hello')}</Text>
             <Text style={[Type.largeTitle, { color: theme.text }]} numberOfLines={1}>
               {userName}
             </Text>
@@ -187,113 +193,39 @@ export default function HomeScreen() {
             hitSlop={10}
             accessibilityRole="button"
             accessibilityLabel={t('push.title')}
-            style={({ pressed }) => [styles.bell, pressed && styles.pressed]}>
-            <Icon name="notifications" size={24} color={theme.text} />
+            style={({ pressed }) => [
+              styles.bell,
+              { backgroundColor: theme.surface },
+              pressed && styles.pressed,
+            ]}>
+            <Icon name="notifications" size={22} color={theme.text} />
           </Pressable>
-          <Avatar name={userName} imageUrl={user?.avatar_url} size={46} />
+          <Avatar name={userName} imageUrl={user?.avatar_url} size={44} />
         </View>
+
+        {/* What do you need — the question the whole app exists to ask. */}
+        <SearchPill />
+
+        {/* The order already in progress, before anything that starts a new one. */}
+        <ActiveOrderCard />
+
+        {/* The services themselves, one tap from an order. */}
+        <ServicesGrid />
 
         {/* Who can take a job this minute — the online firms, as a swipeable
-            showcase. It sits above the two entry points because it answers the
-            same question with a face and a photo, and it removes itself when
-            nobody is online. */}
-        <OnlineCompaniesCarousel />
-
-        {/* The two ways into the platform, at the size of the decision.
-
-            They spent a while as rows in a grouped list, on the argument that a
-            list of destinations is a list. It is the wrong argument here: a
-            Settings list is a place you go to change something you already know
-            about, while this is the entire product asking a first-time customer
-            which half of it they want. At row height, the single question the
-            screen exists to ask was the smallest thing on it. */}
-        <Text style={[Type.footnote, styles.sectionCaption, { color: theme.textSecondary }]}>
-          {t('home.whatNext').toUpperCase()}
-        </Text>
-
-        <View style={styles.heroes}>
-          <HeroCard
-            icon="hammer"
-            colors={Gradients.worker}
-            title={t('customer.workers')}
-            subtitle={t('home.dailyWorkers')}
-            onPress={() => router.push('/categories')}
-          />
-          <HeroCard
-            icon="business"
-            colors={Gradients.company}
-            title={t('customer.companies')}
-            subtitle={t('home.serviceCompanies')}
-            onPress={() => setSection('companies')}
-          />
+            showcase. It removes itself when nobody is online. */}
+        <View style={styles.carousel}>
+          <OnlineCompaniesCarousel />
         </View>
 
-        {/* Look at who is nearby — and the only way to hire more than one person
-            at a time. The subtitle says so: without it this read as "browse",
-            an idle thing to do next to two cards that place an order, and the
-            customer who needed six people to unload a lorry had no reason to
-            ever tap it. */}
-        <Section separatorInset={Row.ICON_INSET} style={styles.browseSection}>
-          <Row
-            icon="people"
-            iconColor="#5E7CFA"
-            title={t('customer.browseWorkers')}
-            subtitle={t('pick.homeHint')}
-            chevron
-            onPress={() => setSection('workers')}
-          />
-        </Section>
+        {/* The two other ways in: a firm, or workers picked by hand — which is
+            also the only way to hire several people at once. */}
+        <EntryCards onFirms={() => setSection('companies')} onWorkers={() => setSection('workers')} />
+
+        {/* Faces, not a list: the best-rated workers within reach. */}
+        <NearbyWorkers onSeeAll={() => setSection('workers')} />
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-/* ===================== Home hero card ===================== */
-
-/**
- * One of the two full-width entry points. The tint is what tells them apart —
- * blue for people, teal for firms — the same pair used on their panels.
- */
-function HeroCard({
-  icon,
-  colors,
-  title,
-  subtitle,
-  onPress,
-}: {
-  icon: IconName;
-  colors: readonly [string, string];
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-}) {
-  const dark = useThemeMode() === 'dark';
-
-  return (
-    <PressableScale
-      onPress={onPress}
-      scaleTo={0.975}
-      accessibilityLabel={title}
-      style={dark ? undefined : Shadow.card}>
-      <LinearGradient
-        colors={[colors[0], colors[1]]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.hero, Squircle]}>
-        <View style={styles.heroGlyph}>
-          <Icon name={icon} size={26} color="#FFFFFF" />
-        </View>
-        <View style={styles.heroText}>
-          <Text style={[Type.title2, styles.heroTitle]} numberOfLines={1}>
-            {title}
-          </Text>
-          <Text style={[Type.subhead, styles.heroSubtitle]} numberOfLines={1}>
-            {subtitle}
-          </Text>
-        </View>
-        <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.85)" />
-      </LinearGradient>
-    </PressableScale>
   );
 }
 
@@ -1035,32 +967,11 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   greetingText: { flex: 1, gap: 1 },
-  bell: { padding: 4 },
+  bell: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  carousel: { marginTop: 28 },
 
   sectionCaption: { paddingHorizontal: Layout.gutter + 4, paddingBottom: 8 },
 
-  heroes: { paddingHorizontal: Layout.gutter, gap: 12 },
-  hero: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    borderRadius: Radius.xl,
-    paddingHorizontal: 20,
-    paddingVertical: 22,
-  },
-  heroGlyph: {
-    width: 52,
-    height: 52,
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
-  heroText: { flex: 1, gap: 3 },
-  heroTitle: { color: '#FFFFFF' },
-  heroSubtitle: { color: 'rgba(255,255,255,0.88)' },
-
-  browseSection: { marginTop: 24 },
 
   radiusSection: { marginTop: 12 },
   guessed: {

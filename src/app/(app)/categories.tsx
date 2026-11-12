@@ -1,32 +1,27 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Text } from '@/components/text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Backdrop } from '@/components/backdrop';
+import { CategoryArt } from '@/components/category-art';
 import { FadeUp } from '@/components/motion';
 import { EmptyState, LoadingState } from '@/components/ui/empty-state';
 import { Header } from '@/components/ui/header';
-import { Icon, type IconName } from '@/components/ui/icon';
 import { PressableScale } from '@/components/ui/pressable-scale';
+import { SearchField } from '@/components/ui/search-field';
 import { StepDots } from '@/components/ui/step-dots';
-import {
-  Layout,
-  Radius,
-  Shadow,
-  Squircle,
-  Stagger,
-  Type,
-  categoryTint,
-} from '@/constants/theme';
+import { Layout, MaxContentWidth, Radius, Shadow, Squircle, Stagger, Type } from '@/constants/theme';
 import { useCategories } from '@/hooks/use-categories';
 import { useRefresh } from '@/hooks/use-refresh';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { useI18n, useT } from '@/i18n';
-import { categoryIcon } from '@/lib/category-icon';
 import { categoryName } from '@/lib/format';
 import type { Category } from '@/lib/types';
 import { useOrderFlow } from '@/store/order-flow';
@@ -64,13 +59,34 @@ export default function CategoriesScreen() {
    * deleted. Arriving from the home card there are none, and the order is the
    * ordinary broadcast.
    */
-  const params = useLocalSearchParams<{ worker?: string | string[]; workerName?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    worker?: string | string[];
+    workerName?: string | string[];
+    /** Set by the home screen's search bar: open with the keyboard up. */
+    focus?: string;
+  }>();
   const targetWorkerIds = asList(params.worker);
   const targetWorkerNames = asList(params.workerName);
   // Names are only for showing back to the customer, so a mismatched pair is
   // not worth refusing the order over — but pairing them up by index when they
   // disagree would label workers with each other's names.
   const namesMatch = targetWorkerNames.length === targetWorkerIds.length;
+
+  /**
+   * Typing narrows the grid, in whichever language the name was typed.
+   * Apostrophes are ignored, so "tamir" finds "Ta'mirlash".
+   */
+  const [query, setQuery] = useState('');
+  const shown = useMemo(() => {
+    const q = plain(query);
+    if (!q) return activeCategories;
+    return activeCategories.filter((c) =>
+      [c.name_uz, c.name_ru, c.name_en].some((name) => plain(name ?? '').includes(q)),
+    );
+  }, [activeCategories, query]);
+
+  const { width } = useWindowDimensions();
+  const tileWidth = Math.floor((Math.min(width, MaxContentWidth) - Layout.gutter * 2 - GRID_GAP) / 2);
 
   const choose = (category: Category) => {
     // A fresh draft per order — leftovers from an abandoned flow would leak in.
@@ -84,6 +100,7 @@ export default function CategoriesScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top', 'bottom']}>
+      <Backdrop />
       <Header
         title={t('customer.workers')}
         large
@@ -99,6 +116,16 @@ export default function CategoriesScreen() {
         <StepDots step={0} total={ORDER_STEPS} />
       </View>
 
+      <View style={styles.search}>
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder={t('category.search')}
+          autoFocus={params.focus === '1'}
+          returnKeyType="search"
+        />
+      </View>
+
       {loading ? (
         <LoadingState />
       ) : error || activeCategories.length === 0 ? (
@@ -107,19 +134,24 @@ export default function CategoriesScreen() {
         <ScrollView
           contentContainerStyle={styles.gridScroll}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           refreshControl={refreshControl}>
-          <View style={styles.grid}>
-            {activeCategories.map((category, i) => (
-              <CategoryTile
-                key={category.id}
-                index={i}
-                label={categoryName(category, lang)}
-                icon={categoryIcon(category)}
-                tint={categoryTint(category.id)}
-                onPress={() => choose(category)}
-              />
-            ))}
-          </View>
+          {shown.length === 0 ? (
+            <EmptyState icon="search" title={t('category.noMatch')} />
+          ) : (
+            <View style={styles.grid}>
+              {shown.map((category, i) => (
+                <CategoryTile
+                  key={category.id}
+                  index={i}
+                  width={tileWidth}
+                  category={category}
+                  label={categoryName(category, lang)}
+                  onPress={() => choose(category)}
+                />
+              ))}
+            </View>
+          )}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -140,16 +172,31 @@ function asList(value: string | string[] | undefined): string[] {
   return parts.flatMap((part) => part.split('|')).filter(Boolean);
 }
 
+/** A name as the search compares it: lower case, no apostrophes of any kind. */
+function plain(text: string): string {
+  return text.toLowerCase().replace(/[ʻʼ’‘'`´]/g, '').trim();
+}
+
+const GRID_GAP = 12;
+/** The picture's height on a tile — wide and short, like a card's cover. */
+const ART_HEIGHT = 92;
+
+/**
+ * One service: its picture as the cover, its name under it.
+ *
+ * The picture comes from the name itself (`lib/category-art.ts`), so a service
+ * the office adds tomorrow arrives with one.
+ */
 function CategoryTile({
+  category,
   label,
-  icon,
-  tint,
+  width,
   index,
   onPress,
 }: {
+  category: Category;
   label: string;
-  icon: IconName;
-  tint: string;
+  width: number;
   index: number;
   onPress: () => void;
 }) {
@@ -157,12 +204,10 @@ function CategoryTile({
   const dark = useThemeMode() === 'dark';
 
   return (
-    <FadeUp index={index} step={Stagger.list} style={styles.tileWrap}>
-      <PressableScale onPress={onPress} scaleTo={0.96} style={dark ? undefined : Shadow.card}>
+    <FadeUp index={index} step={Stagger.list} style={{ width }}>
+      <PressableScale onPress={onPress} scaleTo={0.96} accessibilityLabel={label} style={dark ? undefined : Shadow.card}>
         <View style={[styles.tile, Squircle, { backgroundColor: theme.surface }]}>
-          <View style={[styles.tileIcon, Squircle, { backgroundColor: `${tint}1A` }]}>
-            <Icon name={icon} size={28} color={tint} />
-          </View>
+          <CategoryArt category={category} width={width - 16} height={ART_HEIGHT} radius={14} iconSize={44} />
           <Text
             style={[Type.subheadEmphasized, styles.tileLabel, { color: theme.text }]}
             numberOfLines={2}>
@@ -177,30 +222,16 @@ function CategoryTile({
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   steps: { paddingTop: 12, paddingBottom: 4 },
+  search: { paddingHorizontal: Layout.gutter, paddingTop: 8 },
   gridScroll: { paddingBottom: 32 },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: GRID_GAP,
     paddingHorizontal: Layout.gutter,
-    paddingTop: 12,
+    paddingTop: 16,
   },
-  tileWrap: { flexGrow: 1, flexBasis: '46%' },
-  tile: {
-    borderRadius: Radius.card,
-    paddingVertical: 24,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    gap: 12,
-    minHeight: 140,
-    justifyContent: 'center',
-  },
-  tileIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tileLabel: { textAlign: 'center' },
+  tile: { borderRadius: Radius.card, padding: 8, gap: 10, paddingBottom: 12 },
+  // Two lines reserved, so a row of tiles with a long and a short name lines up.
+  tileLabel: { paddingHorizontal: 4, minHeight: 40 },
 });

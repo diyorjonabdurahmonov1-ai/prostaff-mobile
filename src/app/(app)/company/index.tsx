@@ -35,6 +35,7 @@ import { useAuth } from '@/store/auth';
 import { useAlerts, useCompanyOrders } from '@/store/realtime';
 
 import { Icon, type IconName } from '@/components/ui/icon';
+import { Backdrop } from '@/components/backdrop';
 
 export default function CompanyPanelScreen() {
   const t = useT();
@@ -129,6 +130,7 @@ export default function CompanyPanelScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+      <Backdrop tone={online ? 'online' : 'brand'} />
       {/* No back chevron: this screen is the root of the app for a firm, the
           same way the worker panel is for a worker. It used to draw one, which
           at the root either did nothing or walked out of the account. */}

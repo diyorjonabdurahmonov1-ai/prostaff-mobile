@@ -16,6 +16,7 @@ import { useRefresh } from '@/hooks/use-refresh';
 import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import type { Category } from '@/lib/types';
+import { CategoryArt } from '@/components/category-art';
 
 /**
  * The service list.
@@ -183,6 +184,9 @@ export default function AdminCategoriesScreen() {
             categories.map((c) => (
               <Row
                 key={c.id}
+                // The picture customers will see for it — chosen from the name
+                // (lib/category-art.ts), so fixing a name can change it.
+                left={<CategoryArt category={c} width={40} height={40} radius={11} />}
                 title={c.name_uz}
                 subtitle={`${c.name_ru} · ${c.name_en}\n${c.orders_count ?? 0} ta buyurtma · ${
                   c.providers_count ?? 0
@@ -206,6 +210,11 @@ export default function AdminCategoriesScreen() {
             ))
           )}
         </Section>
+
+        <Text style={[Type.caption1, styles.note, { color: theme.textTertiary }]}>
+          Kategoriya rasmi uning nomiga qarab avtomatik tanlanadi: yangi kategoriya
+          qo&apos;shsangiz yoki nomini tuzatsangiz, mos rasm o&apos;zi chiqadi.
+        </Text>
 
         <Text style={[Type.caption1, styles.note, { color: theme.textTertiary }]}>
           Faolsizlantirilgan kategoriya yangi buyurtmalarda ko&apos;rinmaydi, lekin eski

@@ -8,6 +8,7 @@ import { Header } from '@/components/ui/header';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { useAuth } from '@/store/auth';
+import { Backdrop } from '@/components/backdrop';
 
 /**
  * The customer's profile tab.
@@ -39,6 +40,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+      <Backdrop />
       <Header title={t('profile.title')} large back={false} />
 
       <ScrollView
