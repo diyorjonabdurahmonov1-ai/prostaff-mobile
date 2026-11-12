@@ -37,6 +37,7 @@ import { categoryName, formatSom } from '@/lib/format';
 import type { Order, OrderStatus } from '@/lib/types';
 
 import { Icon } from '@/components/ui/icon';
+import { Backdrop } from '@/components/backdrop';
 
 type Filter = 'active' | 'done';
 
@@ -135,6 +136,7 @@ export default function OrdersScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+      <Backdrop />
       <Header title={t('orders.title')} large back={false} />
 
       <View style={styles.filter}>

@@ -15,6 +15,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { formatSom } from '@/lib/format';
 import { useAuth } from '@/store/auth';
+import { Backdrop } from '@/components/backdrop';
 
 /**
  * The firm's profile — the same account rows every mode shows, plus the record
@@ -48,6 +49,7 @@ export default function CompanyProfileScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+      <Backdrop />
       <Header title={t('profile.title')} large back={false} />
 
       <ScrollView

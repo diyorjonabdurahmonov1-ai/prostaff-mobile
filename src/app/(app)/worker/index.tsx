@@ -32,6 +32,7 @@ import { setWorkerIntent } from '@/lib/presence';
 import type { WorkerProfile } from '@/lib/types';
 import { useAuth } from '@/store/auth';
 import { useAlerts, useWorkerOrders } from '@/store/realtime';
+import { Backdrop } from '@/components/backdrop';
 
 /**
  * The worker's home.
@@ -171,6 +172,7 @@ export default function WorkerPanelScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+      <Backdrop tone={activeOrder ? 'busy' : online ? 'online' : 'brand'} />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
