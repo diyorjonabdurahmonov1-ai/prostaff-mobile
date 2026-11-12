@@ -502,6 +502,79 @@ function ResultCard({
   );
 }
 
+/* ===================== Radius ===================== */
+
+/**
+ * The list the slider asked for: only what is inside the radius, nearest first.
+ *
+ * The server filters by radius too, but the number on the slider is a promise
+ * the screen makes, so it is kept here as well: each item's distance is worked
+ * out on the phone from the point the search was made from, anything further
+ * than the radius is dropped, and the rest are ordered by that distance (which
+ * is also what the card then shows). An item with no usable position is kept,
+ * at the end — better listed than silently hidden.
+ */
+function withinRadius<T extends { distance_km?: number }>(
+  items: T[],
+  radiusKm: number,
+  km: (item: T) => number | null,
+): T[] {
+  return items
+    .map((item) => ({ item, d: km(item) }))
+    .filter(({ d }) => d === null || d <= radiusKm)
+    .sort((a, b) => (a.d ?? Infinity) - (b.d ?? Infinity))
+    .map(({ item, d }) => (d === null ? item : { ...item, distance_km: d }));
+}
+
+/** Kilometres to a point, or null when it was never set (0,0 or missing). */
+function kmTo(from: LatLng, lat?: number, lng?: number): number | null {
+  if (typeof lat !== 'number' || typeof lng !== 'number' || (lat === 0 && lng === 0)) return null;
+  return distanceKm(from, { lat, lng });
+}
+
+/** A firm's distance: the nearer of its office and, if shared, where it is now. */
+function firmKm(from: LatLng, c: CompanyProfile): number | null {
+  const office = kmTo(from, c.lat, c.lng) ?? c.distance_km ?? null;
+  const live = c.live_location ? kmTo(from, c.live_lat, c.live_lng) : null;
+  if (office === null) return live;
+  return live === null ? office : Math.min(office, live);
+}
+
+/**
+ * Said out loud when the search is not measured from where the customer is.
+ *
+ * Without location permission the app measures from central Tashkent — and
+ * showed the result as "nearby" with nothing to say so. A customer in another
+ * city saw Tashkent's workers, or none, and a radius that seemed to do nothing.
+ */
+function GuessedLocationNote({ onRetry }: { onRetry: () => Promise<void> }) {
+  const t = useT();
+  const theme = useTheme();
+  const [busy, setBusy] = useState(false);
+  return (
+    <View style={[styles.guessed, Squircle, { backgroundColor: theme.warningSoft }]}>
+      <Icon name="location" size={18} color={theme.warning} />
+      <Text style={[Type.footnote, styles.guessedText, { color: theme.text }]}>
+        {t('radius.guessed')}
+      </Text>
+      <Button
+        label={t('order.detectLocation')}
+        size="sm"
+        fullWidth={false}
+        loading={busy}
+        onPress={async () => {
+          setBusy(true);
+          try {
+            await onRetry();
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+    </View>
+  );
+}
+
 /* ===================== Companies List ===================== */
 
 /** A firm sharing a live position right now. */
@@ -519,6 +592,10 @@ function CompaniesListScreen({ onBack }: { onBack: () => void }) {
   const [center, setCenter] = useState<LatLng | null>(null);
   /** The point every search on this screen is measured from — see `load`. */
   const centreRef = useRef<LatLng | null>(null);
+  /** The newest search; an older answer arriving late is dropped. */
+  const requestRef = useRef(0);
+  /** The phone's position was not available and central Tashkent stands in. */
+  const [guessed, setGuessed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [showSlider, setShowSlider] = useState(false);
@@ -535,21 +612,30 @@ function CompaniesListScreen({ onBack }: { onBack: () => void }) {
        * return a list that looked like nothing had happened. Changing the radius
        * is one request now, against the point already on screen.
        */
+      const mine = ++requestRef.current;
       let point = centreRef.current;
       if (!point) {
         const coords = await getCoordsWithFallback();
         point = { lat: coords.lat, lng: coords.lng };
         centreRef.current = point;
         setCenter(point);
+        setGuessed(!coords.resolved);
       }
       const data = await api.get<CompanyProfile[]>(
         `/companies?lat=${point.lat}&lng=${point.lng}&radius_km=${radiusKm}`,
       );
-      // Firms that can take the job now first, then by distance as the server
-      // sent them. An offline firm cannot be ordered from (its page says so),
-      // so it was noise at the top of the list.
+      // An answer to a radius the slider has already left must not land on
+      // top of the newer one.
+      if (mine !== requestRef.current) return;
+      // Firms that can take the job now first, then nearest first — measured
+      // here from the nearer of a firm's two places, and held to the radius
+      // on the slider (see `withinRadius`). An offline firm cannot be ordered
+      // from (its page says so), so it was noise at the top of the list.
+      const centre = point;
       setCompanies(
-        [...(data ?? [])].sort((a, b) => Number(!!b.online) - Number(!!a.online)),
+        withinRadius(data ?? [], radiusKm, (c) => firmKm(centre, c)).sort(
+          (a, b) => Number(!!b.online) - Number(!!a.online),
+        ),
       );
     } catch {
     } finally {
@@ -585,17 +671,6 @@ function CompaniesListScreen({ onBack }: { onBack: () => void }) {
 
   const pinnedCompanies = companies.filter((c) => !!c.lat && !!c.lng);
 
-  /**
-   * The nearer of the firm's two places. The server measures from the office;
-   * a firm sharing its live position may be much closer than that right now,
-   * and the number on its card should say so.
-   */
-  const nearestKm = (c: CompanyProfile): number | undefined => {
-    const live = isLive(c) && center ? distanceKm(center, { lat: c.live_lat!, lng: c.live_lng! }) : null;
-    if (live == null) return c.distance_km;
-    return c.distance_km == null ? live : Math.min(c.distance_km, live);
-  };
-
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <Header title={t('customer.companies')} large back onBack={onBack} />
@@ -610,6 +685,17 @@ function CompaniesListScreen({ onBack }: { onBack: () => void }) {
           open={showSlider}
           toggle={() => setShowSlider(!showSlider)}
         />
+        {guessed ? (
+          <GuessedLocationNote
+            onRetry={async () => {
+              const coords = await getCoordsWithFallback(true);
+              if (!coords.resolved) return;
+              centreRef.current = null;
+              setGuessed(false);
+              await load();
+            }}
+          />
+        ) : null}
 
         {/* The firms around you, on the map — same set as the list below, minus
             the ones that never dropped a pin (they would land at 0,0). */}
@@ -660,7 +746,7 @@ function CompaniesListScreen({ onBack }: { onBack: () => void }) {
                   key={c.id}
                   name={c.name}
                   meta={[serviceLine(c), c.address].filter(Boolean).join(' · ')}
-                  distanceKm={nearestKm(c)}
+                  distanceKm={c.distance_km}
                   rating={c.rating}
                   count={c.ratings_count}
                   online={c.online}
@@ -689,6 +775,10 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
   const [center, setCenter] = useState<LatLng | null>(null);
   /** The point every search on this screen is measured from — see `load`. */
   const centreRef = useRef<LatLng | null>(null);
+  /** The newest search; an older answer arriving late is dropped. */
+  const requestRef = useRef(0);
+  /** The phone's position was not available and central Tashkent stands in. */
+  const [guessed, setGuessed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [showSlider, setShowSlider] = useState(false);
@@ -718,17 +808,24 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
        * return a list that looked like nothing had happened. Changing the radius
        * is one request now, against the point already on screen.
        */
+      const mine = ++requestRef.current;
       let point = centreRef.current;
       if (!point) {
         const coords = await getCoordsWithFallback();
         point = { lat: coords.lat, lng: coords.lng };
         centreRef.current = point;
         setCenter(point);
+        setGuessed(!coords.resolved);
       }
       const data = await api.get<WorkerProfile[]>(
         `/workers/nearby?lat=${point.lat}&lng=${point.lng}&radius_km=${radiusKm}`,
       );
-      setWorkers(data ?? []);
+      if (mine !== requestRef.current) return;
+      // Nearest first, and nobody from outside the radius on the slider.
+      const centre = point;
+      setWorkers(
+        withinRadius(data ?? [], radiusKm, (w) => kmTo(centre, w.lat, w.lng) ?? w.distance_km ?? null),
+      );
     } catch {
     } finally {
       setLoading(false);
@@ -820,6 +917,17 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
           open={showSlider}
           toggle={() => setShowSlider(!showSlider)}
         />
+        {guessed ? (
+          <GuessedLocationNote
+            onRetry={async () => {
+              const coords = await getCoordsWithFallback(true);
+              if (!coords.resolved) return;
+              centreRef.current = null;
+              setGuessed(false);
+              await load();
+            }}
+          />
+        ) : null}
 
         {/* Who is around, on the map — the same set as the list below it.
             Deliberately not pannable: it sits inside the scrolling list, and a
@@ -955,6 +1063,16 @@ const styles = StyleSheet.create({
   browseSection: { marginTop: 24 },
 
   radiusSection: { marginTop: 12 },
+  guessed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: Layout.gutter,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: Radius.md,
+  },
+  guessedText: { flex: 1 },
   sliderRow: {
     flexDirection: 'row',
     alignItems: 'center',
