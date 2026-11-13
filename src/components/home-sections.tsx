@@ -10,7 +10,7 @@
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { CategoryArt } from '@/components/category-art';
@@ -31,10 +31,13 @@ import type { Category, Order, OrderStatus, WorkerProfile } from '@/lib/types';
 import { useOrderFlow } from '@/store/order-flow';
 
 const DONE: OrderStatus[] = ['completed', 'cancelled', 'rejected', 'expired'];
-/** How many services the home shows before "Hammasi". Two rows of four. */
-const SERVICES_SHOWN = 8;
-const SERVICE_COLUMNS = 4;
+/** Tiles across the services row; the fraction is the one peeking at the edge. */
+const SERVICES_VISIBLE = 4.35;
 const SERVICE_GAP = 12;
+/** How long each service stays put before the row steps on. */
+const RAIL_STEP_MS = 2200;
+/** A touch holds the row still for this long after the finger lifts. */
+const RAIL_PAUSE_MS = 6000;
 /** The nearby strip: who is within this far, best rated first. */
 const NEARBY_KM = 15;
 const NEARBY_SHOWN = 10;
@@ -159,11 +162,18 @@ export function BlockHead({ title, action, onAction }: { title: string; action?:
 }
 
 /**
- * The services, one tap from an order.
+ * The services, one tap from an order — as a single row that turns by itself.
  *
  * They used to be a screen away, behind a button that said "Ishchilar" — the
  * customer had to know that workers were where services lived. Here each one
  * is a picture and a name, and a tap starts the order for it.
+ *
+ * One row rather than a grid: every service is on it, however many the office
+ * adds, at the cost of one line of screen. It steps along on its own so the
+ * ones off the edge get seen, stops the moment a finger touches it, and can be
+ * swiped either way. The list is laid out twice end to end, and the row slips
+ * back by one list's width whenever it reaches the second copy — which is what
+ * lets it go round for ever without a visible jump.
  */
 export function ServicesGrid() {
   const t = useT();
@@ -174,10 +184,35 @@ export function ServicesGrid() {
   const { reset } = useOrderFlow();
   const { width } = useWindowDimensions();
 
-  if (activeCategories.length === 0) return null;
+  const railRef = useRef<ScrollView>(null);
+  const offsetRef = useRef(0);
+  const touchedAt = useRef(0);
 
   const content = Math.min(width, MaxContentWidth) - Layout.gutter * 2;
-  const tile = Math.floor((content - SERVICE_GAP * (SERVICE_COLUMNS - 1)) / SERVICE_COLUMNS);
+  // A third of a tile shows at the edge: the plainest hint that there is more.
+  const tile = Math.floor((content - SERVICE_GAP * 3) / SERVICES_VISIBLE);
+  const step = tile + SERVICE_GAP;
+  const count = activeCategories.length;
+  // Nothing to turn when everything already fits.
+  const loops = count > Math.floor(SERVICES_VISIBLE);
+  const lap = count * step;
+
+  useEffect(() => {
+    if (!loops) return;
+    const id = setInterval(() => {
+      if (Date.now() - touchedAt.current < RAIL_PAUSE_MS) return;
+      let from = Math.round(offsetRef.current / step);
+      // Into the second copy: slip back a whole lap first, unseen.
+      if (from >= count) {
+        from -= count;
+        railRef.current?.scrollTo({ x: from * step, animated: false });
+      }
+      railRef.current?.scrollTo({ x: (from + 1) * step, animated: true });
+    }, RAIL_STEP_MS);
+    return () => clearInterval(id);
+  }, [loops, count, step]);
+
+  if (count === 0) return null;
 
   const choose = (category: Category) => {
     // A fresh draft per order — the same rule the services screen follows.
@@ -185,28 +220,48 @@ export function ServicesGrid() {
     router.push('/details');
   };
 
+  const items = loops ? [...activeCategories, ...activeCategories] : activeCategories;
+
   return (
     <View style={styles.block}>
-      <BlockHead
-        title={t('home.services')}
-        action={activeCategories.length > SERVICES_SHOWN ? t('home.all') : undefined}
-        onAction={() => router.push('/categories')}
-      />
-      <View style={styles.services}>
-        {activeCategories.slice(0, SERVICES_SHOWN).map((category) => (
+      <BlockHead title={t('home.services')} action={t('home.all')} onAction={() => router.push('/categories')} />
+      <ScrollView
+        ref={railRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={step}
+        decelerationRate="fast"
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          offsetRef.current = e.nativeEvent.contentOffset.x;
+        }}
+        onScrollBeginDrag={() => {
+          touchedAt.current = Date.now();
+        }}
+        onScrollEndDrag={() => {
+          touchedAt.current = Date.now();
+        }}
+        onMomentumScrollEnd={(e) => {
+          // A swipe that carried into the second copy comes back the same way.
+          const x = e.nativeEvent.contentOffset.x;
+          if (loops && x >= lap) railRef.current?.scrollTo({ x: x - lap, animated: false });
+        }}
+        contentContainerStyle={styles.rail}
+        style={styles.railScroll}>
+        {items.map((category, i) => (
           <PressableScale
-            key={category.id}
+            key={`${category.id}-${i}`}
             onPress={() => choose(category)}
             scaleTo={0.94}
             accessibilityLabel={categoryName(category, lang)}
             style={{ width: tile }}>
-            <CategoryArt category={category} width={tile} height={tile} radius={20} />
-            <Text style={[Type.caption1, styles.serviceLabel, { color: theme.text }]} numberOfLines={2}>
+            <CategoryArt category={category} width={tile} height={tile} radius={22} />
+            <Text style={[Type.caption1, styles.serviceLabel, { color: theme.text }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.82}>
               {categoryName(category, lang)}
             </Text>
           </PressableScale>
         ))}
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -383,7 +438,8 @@ const styles = StyleSheet.create({
   },
   pillRow: { flexDirection: 'row', marginTop: 3 },
 
-  services: { flexDirection: 'row', flexWrap: 'wrap', columnGap: SERVICE_GAP, rowGap: 16 },
+  railScroll: { marginHorizontal: -Layout.gutter },
+  rail: { paddingHorizontal: Layout.gutter, gap: SERVICE_GAP },
   serviceLabel: { textAlign: 'center', marginTop: 6 },
 
   entries: { flexDirection: 'row', gap: 12 },
