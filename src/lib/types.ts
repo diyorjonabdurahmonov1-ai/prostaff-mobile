@@ -289,6 +289,15 @@ export interface Order {
    * Absent from a server that does not gate batches; treated as ready.
    */
   batch_ready?: boolean;
+  /** Who cancelled it: customer, worker, company or admin — newer servers only. */
+  cancelled_by?: 'customer' | 'worker' | 'company' | 'admin';
+  /** When the worker said they had reached the customer. */
+  arrived_at?: string;
+  /**
+   * From when the customer may report that the worker never came. Present only
+   * while a worker holds the job and has not arrived.
+   */
+  no_show_after?: string;
   /** How many places of the request are filled, for the waiting message. */
   batch_found?: number;
   created_at: string;

@@ -16,6 +16,7 @@ import { useEffect, useMemo } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { UpdateGate } from '@/components/update-gate';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { I18nProvider } from '@/i18n';
@@ -117,6 +118,9 @@ function RootNavigator() {
           is the screen, not the root. */}
       <View style={{ flex: 1, backgroundColor: palette.background }}>
         <StatusBar style={themeName === 'dark' ? 'light' : 'dark'} />
+        {/* Inside the ready check, so the splash screen is already down by the
+            time this can replace the app with "please update". */}
+        <UpdateGate>
         <Stack
           screenOptions={{
             headerShown: false,
@@ -134,6 +138,7 @@ function RootNavigator() {
               as well as from the profile. */}
           <Stack.Screen name="legal/offer" />
         </Stack>
+        </UpdateGate>
       </View>
     </ThemeProvider>
   );

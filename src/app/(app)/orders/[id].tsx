@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -58,6 +58,13 @@ export default function OrderDetailScreen() {
   const { order, refetch } = usePollOrder(id ?? null, { stopWhen: KEEP_POLLING });
   const load = refetch;
   const [busy, setBusy] = useState(false);
+  // A coarse clock, so "you can call another worker after 14:30" turns into
+  // the button when 14:30 comes without waiting for the next poll.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 20000);
+    return () => clearInterval(timer);
+  }, []);
 
   const { refreshControl } = useRefresh(load);
 
@@ -164,7 +171,43 @@ export default function OrderDetailScreen() {
    * the worker's side. It used to read exactly like the customer's own
    * cancellation, and offered to ask the same audience again.
    */
-  const droppedByWorker = order.status === 'cancelled' && !!order.worker_id;
+  const droppedByWorker =
+    order.status === 'cancelled' &&
+    !!order.worker_id &&
+    order.cancelled_by !== 'customer' &&
+    order.cancelled_by !== 'admin';
+
+  /** The worker took the job and never came: hand it to everybody else. */
+  const reportNoShow = () =>
+    Alert.alert(t('noShow.confirmTitle'), t('noShow.confirmBody'), [
+      { text: t('job.no'), style: 'cancel' },
+      {
+        text: t('noShow.yes'),
+        style: 'destructive',
+        onPress: async () => {
+          setBusy(true);
+          try {
+            await api.post<Order>(`/orders/${order.id}/no-show`);
+            await load();
+          } catch (err) {
+            Alert.alert(t('common.error'), err instanceof Error ? err.message : t('common.genericError'));
+          } finally {
+            setBusy(false);
+          }
+        },
+      },
+    ]);
+
+  const cancelAccepted = () =>
+    Alert.alert(t('order.cancelAcceptedTitle'), t('order.cancelAcceptedBody'), [
+      { text: t('job.no'), style: 'cancel' },
+      { text: t('order.cancelAcceptedYes'), style: 'destructive', onPress: cancel },
+    ]);
+
+  // The server says from when a no-show may be reported; the clock here only
+  // decides which of the two lines to show, and the server checks again.
+  const noShowAt = order.no_show_after ? new Date(order.no_show_after) : null;
+  const noShowDue = !!noShowAt && now >= noShowAt.getTime() && order.batch_ready !== false;
   const notified = order.invited_worker_ids?.length ?? 0;
 
   const firmRecover = (
@@ -261,12 +304,40 @@ export default function OrderDetailScreen() {
       case 'accepted':
       case 'in_progress':
         return (
-          <Button
-            label={t('order.markComplete')}
-            icon="checkmark-done"
-            onPress={complete}
-            loading={busy}
-          />
+          <View style={styles.footerStack}>
+            {isCompanyOrder ? null : order.arrived_at ? (
+              <Text style={[Type.footnoteEmphasized, styles.footerNote, { color: theme.success }]}>
+                {t('noShow.arrived')}
+              </Text>
+            ) : noShowDue ? (
+              <Button
+                label={t('noShow.action')}
+                icon="people"
+                variant="secondary"
+                onPress={reportNoShow}
+                disabled={busy}
+              />
+            ) : noShowAt && order.batch_ready !== false ? (
+              <Text style={[Type.footnote, styles.footerNote, { color: theme.textSecondary }]}>
+                {t('noShow.wait', {
+                  time: noShowAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                })}
+              </Text>
+            ) : null}
+            <Button
+              label={t('order.markComplete')}
+              icon="checkmark-done"
+              onPress={complete}
+              loading={busy}
+            />
+            <Button
+              label={t('order.cancelAccepted')}
+              icon="close"
+              variant="gray"
+              onPress={cancelAccepted}
+              disabled={busy}
+            />
+          </View>
         );
       case 'completed':
         return (
@@ -490,6 +561,7 @@ function OutcomeBanner({
 
 const styles = StyleSheet.create({
   footerStack: { gap: 8 },
+  footerNote: { textAlign: 'center', paddingHorizontal: 8 },
   banner: {
     flexDirection: 'row',
     alignItems: 'flex-start',

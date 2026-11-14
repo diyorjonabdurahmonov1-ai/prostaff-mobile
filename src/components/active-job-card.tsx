@@ -90,6 +90,22 @@ export function ActiveJobCard({
    */
   const gathering = (order.batch_size ?? 0) > 1 && order.batch_ready === false;
 
+  /** "I am at the customer's" — after this they cannot report a no-show. */
+  const arrive = async () => {
+    setBusy(true);
+    try {
+      await api.post(`/worker/orders/${order.id}/arrived`);
+      await onEnded();
+    } catch (err) {
+      Alert.alert(
+        t('common.error'),
+        err instanceof Error && err.message ? err.message : t('common.genericError'),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const end = async (how: Ending) => {
     setBusy(true);
     try {
@@ -227,6 +243,19 @@ export function ActiveJobCard({
           </View>
         ) : null}
 
+        {/* ---- Arrival ---- Said once; from then on the customer can no longer
+            report that nobody came. */}
+        {gathering ? null : order.arrived_at ? (
+          <View style={[styles.arrived, Squircle, { backgroundColor: theme.successSoft }]}>
+            <Icon name="checkmark-circle" size={18} color={theme.success} />
+            <Text style={[Type.footnoteEmphasized, styles.flex, { color: theme.success }]}>
+              {t('job.arrivedDone')}
+            </Text>
+          </View>
+        ) : (
+          <Button label={t('job.arrived')} icon="location" variant="secondary" onPress={arrive} disabled={busy} />
+        )}
+
         {/* ---- How it ends ---- */}
         <View style={styles.actions}>
           {/* Hand-built rather than a Button variant: the system has no soft
@@ -352,6 +381,14 @@ const styles = StyleSheet.create({
 
   mapBlock: { borderRadius: Radius.lg, overflow: 'hidden' },
 
+  arrived: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: Radius.md,
+  },
   actions: { flexDirection: 'row', gap: 10, marginTop: 2 },
   cancelBtn: {
     flex: 1,
