@@ -1,0 +1,15 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="expo.modules.prostaffoverlay" >
+4
+5    <uses-sdk android:minSdkVersion="24" />
+6    <!--
+7       "Display over other apps": what lets the floating bubble stay on screen
+8       while another app is in front, and what lets the app come back to the
+9       front when an order arrives. The user grants it in system settings.
+10    -->
+11    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+11-->/home/user/prostaff-mobile/modules/prostaff-overlay/android/src/main/AndroidManifest.xml:5:3-76
+11-->/home/user/prostaff-mobile/modules/prostaff-overlay/android/src/main/AndroidManifest.xml:5:20-73
+12
+13</manifest>

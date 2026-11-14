@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api';
 import { onOrderAlert, presentLocalNotification } from '@/lib/notifications';
+import { bringToFront, ringBubble } from '@/lib/overlay';
 import { socket } from '@/lib/socket';
 import type { AppAlert, AppNotification, Order, OrderStatus, Role } from '@/lib/types';
 
@@ -308,6 +309,12 @@ export function useInviteAlerts(enabled: boolean, intervalMs = DEFAULT_INTERVAL)
               body: order.description || undefined,
               data: { type: 'order.invite', order_id: order.id },
             });
+            // With the app out of sight, the bubble turns into an alert and the
+            // app comes back to the front, so the order is on screen at once.
+            if (AppState.currentState !== 'active') {
+              ringBubble('Yangi buyurtma!');
+              bringToFront();
+            }
           }
         }
         primedRef.current = true;

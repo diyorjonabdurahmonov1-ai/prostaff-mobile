@@ -34,6 +34,8 @@ import { useAuth } from '@/store/auth';
 import { useAlerts, useWorkerOrders } from '@/store/realtime';
 import { Backdrop } from '@/components/backdrop';
 import { BackgroundAccessCard } from '@/components/background-access-card';
+import { WorkRequirementsCard } from '@/components/work-requirements-card';
+import { useWorkRequirements } from '@/hooks/use-work-requirements';
 
 /**
  * The worker's home.
@@ -118,9 +120,20 @@ export default function WorkerPanelScreen() {
   const location = useLiveLocation({ tracking: false });
   /** The app cannot place this worker, so it must not offer them work. */
   const locationBlocked = location.status !== 'ok' && location.status !== 'checking';
+  /**
+   * Notifications and "display over other apps": without them an order can
+   * arrive and not be seen, so the switch stays off until they are given. Only
+   * once the first read is in — a screen must not scold on a guess.
+   */
+  const requirements = useWorkRequirements();
+  const requirementsMissing = requirements.checked && !requirements.ok;
 
   const setOnline = async (next: boolean) => {
     if (busy) return;
+    if (next && requirementsMissing) {
+      Alert.alert(t('req.needTitle'), t('req.needBody'));
+      return;
+    }
     // No location, no online: the tap asks for it — and carries on if the
     // worker grants it, so one tap is enough.
     if (next && locationBlocked && (await location.fix()) !== 'ok') return;
@@ -169,7 +182,7 @@ export default function WorkerPanelScreen() {
   // Without a location the worker is offline in every way that matters to them
   // (no orders reach them), whatever the server last heard — so the whole
   // screen says so, not just the switch.
-  const online = (pendingOnline ?? profile.online) && !locationBlocked;
+  const online = (pendingOnline ?? profile.online) && !locationBlocked && !requirementsMissing;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
@@ -257,9 +270,9 @@ export default function WorkerPanelScreen() {
         <FadeUp index={1} step={Stagger.card} style={styles.block}>
           {locationBlocked ? (
             <LocationBanner status={location.status} onFix={location.fix} />
-          ) : (
-            <BackgroundAccessCard />
-          )}
+          ) : null}
+          {requirementsMissing ? <WorkRequirementsCard requirements={requirements} /> : null}
+          {!locationBlocked && !requirementsMissing ? <BackgroundAccessCard /> : null}
           <OnlineToggle
             online={online}
             disabled={busy}
@@ -275,7 +288,9 @@ export default function WorkerPanelScreen() {
               ? t('order.busyWorker')
               : locationBlocked
                 ? t('loc.toggleHint')
-                : online
+                : requirementsMissing
+                  ? t('req.offHint')
+                  : online
                 ? t('worker.onlineHint')
                 : t('worker.offlineHint')}
           </Text>

@@ -1,0 +1,20 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/user/prostaff-mobile/modules/prostaff-overlay/android/src/main/AndroidManifest.xml:1:1-6:12
+INJECTED from /home/user/prostaff-mobile/modules/prostaff-overlay/android/src/main/AndroidManifest.xml:1:1-6:12
+	package
+		INJECTED from /home/user/prostaff-mobile/modules/prostaff-overlay/android/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /home/user/prostaff-mobile/modules/prostaff-overlay/android/src/main/AndroidManifest.xml:1:11-69
+uses-permission#android.permission.SYSTEM_ALERT_WINDOW
+ADDED from /home/user/prostaff-mobile/modules/prostaff-overlay/android/src/main/AndroidManifest.xml:5:3-76
+	android:name
+		ADDED from /home/user/prostaff-mobile/modules/prostaff-overlay/android/src/main/AndroidManifest.xml:5:20-73
+uses-sdk
+INJECTED from /home/user/prostaff-mobile/modules/prostaff-overlay/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /home/user/prostaff-mobile/modules/prostaff-overlay/android/src/main/AndroidManifest.xml
+INJECTED from /home/user/prostaff-mobile/modules/prostaff-overlay/android/src/main/AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from /home/user/prostaff-mobile/modules/prostaff-overlay/android/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /home/user/prostaff-mobile/modules/prostaff-overlay/android/src/main/AndroidManifest.xml

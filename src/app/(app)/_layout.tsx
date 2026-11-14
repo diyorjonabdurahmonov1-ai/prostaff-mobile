@@ -1,11 +1,14 @@
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
+import { AppState, Platform } from 'react-native';
 
 import { CardPaymentHost } from '@/components/card-payment-host';
 import { useTheme } from '@/hooks/use-theme';
 import { useLiveLocation } from '@/hooks/use-live-location';
+import { useWorkRequirements } from '@/hooks/use-work-requirements';
 import { startBackgroundLocation, stopBackgroundLocation } from '@/lib/background-location';
 import { setLiveLocation } from '@/lib/company-live';
+import { hideBubble, showBubble } from '@/lib/overlay';
 import { firmMayReport, setFirmLiveIntent, setWorkerIntent, workerMayReport } from '@/lib/presence';
 import { useT } from '@/i18n';
 import {
@@ -152,6 +155,55 @@ function WorkerLocationGuard() {
     },
   });
   const blocked = status !== 'ok' && status !== 'checking';
+
+  // A permission taken away while online has the same effect as location lost:
+  // no order would be seen in time, so the worker goes offline, and is told.
+  const requirements = useWorkRequirements();
+  const permissionLapsed = Platform.OS === 'android' && requirements.checked && !requirements.ok;
+  const permissionLapseRef = useRef(false);
+  useEffect(() => {
+    if (!permissionLapsed) {
+      permissionLapseRef.current = false;
+      return;
+    }
+    if (!online || permissionLapseRef.current) return;
+    permissionLapseRef.current = true;
+    setWorkerIntent(false);
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const goOffline = (attempt: number) => {
+      api
+        .post('/worker/status', { online: false })
+        .then(() => refreshMe())
+        .catch(() => {
+          if (attempt < LAPSE_RETRIES) timers.push(setTimeout(() => goOffline(attempt + 1), LAPSE_RETRY_MS));
+        });
+    };
+    goOffline(0);
+    presentLocalNotification({
+      title: t('req.lostTitle'),
+      body: t('req.lostBody'),
+      data: { type: 'permission.lost' },
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [permissionLapsed, online, refreshMe, t]);
+
+  // The floating bubble: while the worker is online and the app is out of
+  // sight, a round icon stays over whatever is on screen. It is gone the moment
+  // the app is in front again.
+  const bubbleAllowed = online && requirements.overlay;
+  useEffect(() => {
+    if (!bubbleAllowed) {
+      hideBubble();
+      return;
+    }
+    const apply = (state: string) => {
+      if (state === 'active') hideBubble();
+      else showBubble(t('bubble.online'));
+    };
+    apply(AppState.currentState);
+    const sub = AppState.addEventListener('change', apply);
+    return () => sub.remove();
+  }, [bubbleAllowed, t]);
 
   // The same reports, kept coming once the app is behind another one or the
   // phone is in a pocket — for exactly as long as the worker is online.
