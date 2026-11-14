@@ -1,14 +1,14 @@
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { AppState, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 import { CardPaymentHost } from '@/components/card-payment-host';
 import { useTheme } from '@/hooks/use-theme';
 import { useLiveLocation } from '@/hooks/use-live-location';
+import { useAwayBubble } from '@/hooks/use-away-bubble';
 import { useWorkRequirements } from '@/hooks/use-work-requirements';
 import { startBackgroundLocation, stopBackgroundLocation } from '@/lib/background-location';
 import { setLiveLocation } from '@/lib/company-live';
-import { hideBubble, showBubble } from '@/lib/overlay';
 import { firmMayReport, setFirmLiveIntent, setWorkerIntent, workerMayReport } from '@/lib/presence';
 import { useT } from '@/i18n';
 import {
@@ -30,7 +30,7 @@ const LAPSE_RETRIES = 3;
 export default function AppLayout() {
   const theme = useTheme();
   const router = useRouter();
-  const { user, activeMode, refreshMe } = useAuth();
+  const { user, activeMode } = useAuth();
 
   // Keep the push token registered while signed in — the endpoint is behind
   // auth, so doing this on bare mount just 401s and push never worked. One
@@ -76,26 +76,6 @@ export default function AppLayout() {
   const isWorker = activeMode === 'worker' && !!user?.worker_profile;
   const isCompany = activeMode === 'company' && !!user?.company_profile;
 
-  // Auto-online for firms: entering company mode puts the firm online.
-  //
-  // Workers are deliberately left out. Going online is the worker's own
-  // decision — it means their phone starts ringing with jobs — and switching
-  // them on behind their back undid the toggle: a worker who went offline was
-  // put straight back online the next time they opened the app.
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      try {
-        if (activeMode === 'company' && user.company_profile && !user.company_profile.online) {
-          await api.post('/company/status', { online: true });
-          refreshMe();
-        }
-      } catch {
-        // best-effort
-      }
-    })();
-  }, [activeMode]); // eslint-disable-line react-hooks/exhaustive-deps
-
   return (
     <OrderFlowProvider>
       <Stack
@@ -118,6 +98,7 @@ export default function AppLayout() {
           something has to know they exist. */}
       <CardPaymentHost />
       {isWorker ? <WorkerLocationGuard /> : null}
+      {isCompany ? <CompanyPresenceGuard /> : null}
       {isCompany ? <CompanyLiveGuard /> : null}
       {/* Incoming jobs are not a takeover any more — they land as cards in the
           worker's list (see components/incoming-order-card.tsx); the push
@@ -187,23 +168,9 @@ function WorkerLocationGuard() {
     return () => timers.forEach(clearTimeout);
   }, [permissionLapsed, online, refreshMe, t]);
 
-  // The floating bubble: while the worker is online and the app is out of
-  // sight, a round icon stays over whatever is on screen. It is gone the moment
-  // the app is in front again.
-  const bubbleAllowed = online && requirements.overlay;
-  useEffect(() => {
-    if (!bubbleAllowed) {
-      hideBubble();
-      return;
-    }
-    const apply = (state: string) => {
-      if (state === 'active') hideBubble();
-      else showBubble(t('bubble.online'));
-    };
-    apply(AppState.currentState);
-    const sub = AppState.addEventListener('change', apply);
-    return () => sub.remove();
-  }, [bubbleAllowed, t]);
+  // The pill over other apps while the worker is online and has left the app.
+  // Their location service already holds the process, so no keep-alive.
+  useAwayBubble({ active: online && requirements.ok, keepAlive: false });
 
   // The same reports, kept coming once the app is behind another one or the
   // phone is in a pocket — for exactly as long as the worker is online.
@@ -247,6 +214,66 @@ function WorkerLocationGuard() {
     return () => timers.forEach(clearTimeout);
   }, [blocked, online, refreshMe, t]);
 
+  return null;
+}
+
+/**
+ * A firm's presence: online only with the permissions that let an order be
+ * seen, and the pill over other apps while it waits.
+ *
+ * Entering company mode puts the firm online — but only once notifications and
+ * "display over other apps" are allowed, and a permission taken away while
+ * online takes it offline again, the same rule the worker has. Workers are
+ * deliberately not put online for them: going online is their own decision,
+ * and switching them on behind their back undid the toggle.
+ *
+ * A firm that does not share its location has no service holding the app in the
+ * background, so one is run for it while it is online (see lib/overlay).
+ */
+function CompanyPresenceGuard() {
+  const t = useT();
+  const { user, refreshMe } = useAuth();
+  const firm = user?.company_profile;
+  const online = !!firm?.online;
+  const requirements = useWorkRequirements();
+
+  // Once per entry into company mode, and only when it is allowed.
+  const autoOnlineRef = useRef(false);
+  useEffect(() => {
+    if (autoOnlineRef.current || !firm || !requirements.checked || !requirements.ok) return;
+    autoOnlineRef.current = true;
+    if (firm.online) return;
+    api
+      .post('/company/status', { online: true })
+      .then(() => refreshMe())
+      .catch(() => {
+        // best-effort
+      });
+  }, [firm, requirements.checked, requirements.ok, refreshMe]);
+
+  const lapsed = Platform.OS === 'android' && requirements.checked && !requirements.ok;
+  const lapseRef = useRef(false);
+  useEffect(() => {
+    if (!lapsed) {
+      lapseRef.current = false;
+      return;
+    }
+    if (!online || lapseRef.current) return;
+    lapseRef.current = true;
+    api
+      .post('/company/status', { online: false })
+      .then(() => refreshMe())
+      .catch(() => {
+        // The next foreground retries it.
+      });
+    presentLocalNotification({
+      title: t('req.lostTitle'),
+      body: t('req.lostBody'),
+      data: { type: 'permission.lost' },
+    });
+  }, [lapsed, online, refreshMe, t]);
+
+  useAwayBubble({ active: online && requirements.ok, keepAlive: !firm?.live_location });
   return null;
 }
 

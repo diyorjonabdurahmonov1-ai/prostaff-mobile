@@ -68,6 +68,17 @@ class ProstaffOverlayModule : Module() {
       BubbleOverlay.hide(ctx)
     }
 
+    // Holds the app's process while a provider is online (see KeepAliveService).
+    Function("startKeepAlive") { title: String, body: String ->
+      val ctx = context ?: return@Function false
+      KeepAliveService.start(ctx, title, body)
+    }
+
+    Function("stopKeepAlive") {
+      val ctx = context ?: return@Function false
+      KeepAliveService.stop(ctx)
+    }
+
     // Brings the app back in front of whatever is on screen. Only works while
     // the permission is granted and the bubble is showing.
     Function("bringToFront") {

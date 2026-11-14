@@ -507,6 +507,15 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
                 body: n.body,
                 data: { type: n.type, notification_id: n.id },
               });
+              // A new order for a firm: with the app out of sight the pill turns
+              // into an alert and the app comes to the front, as for a worker.
+              if (
+                (n.type === 'order.new' || n.type === 'order.invite') &&
+                AppState.currentState !== 'active'
+              ) {
+                ringBubble(n.title || 'Yangi buyurtma!');
+                bringToFront();
+              }
             }
           }
         }

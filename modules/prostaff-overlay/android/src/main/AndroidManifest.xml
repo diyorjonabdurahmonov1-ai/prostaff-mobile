@@ -3,4 +3,21 @@
        while another app is in front, and what lets the app come back to the
        front when an order arrives. The user grants it in system settings. -->
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+  <application>
+    <!-- Keeps the app's process alive while a provider is online and has no
+         other reason to be (a firm that does not share its location), so the
+         bubble stays up and new orders are still noticed with the app closed. -->
+    <service
+      android:name=".KeepAliveService"
+      android:exported="false"
+      android:foregroundServiceType="specialUse"
+      android:stopWithTask="false">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="Keeps an online provider reachable so new orders are shown over other apps" />
+    </service>
+  </application>
 </manifest>
