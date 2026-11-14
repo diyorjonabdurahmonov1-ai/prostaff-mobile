@@ -127,7 +127,9 @@ export async function startBackgroundLocation(
         notificationTitle: notice.title,
         notificationBody: notice.body,
         notificationColor: '#1B6EF3',
-        killServiceOnDestroy: true,
+        // The worker stays online, with the bubble over other apps, after the
+        // app is closed from the recents list — as a taxi driver's app does.
+        killServiceOnDestroy: false,
       },
     });
     return true;

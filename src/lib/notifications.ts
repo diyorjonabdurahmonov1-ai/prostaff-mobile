@@ -264,6 +264,28 @@ export async function notificationPermissionGranted(): Promise<boolean> {
   }
 }
 
+/**
+ * Asks for notification permission and says how it went: `granted`, `denied`
+ * (the system prompt was refused but can be shown again), or `blocked` (it
+ * will not be shown again — only the app's settings can switch it on).
+ */
+export async function requestNotificationPermission(): Promise<'granted' | 'denied' | 'blocked'> {
+  const Notifications = notifications();
+  if (!Notifications) return 'blocked';
+  try {
+    const current = await Notifications.getPermissionsAsync();
+    if (current.granted) return 'granted';
+    if (!current.canAskAgain) return 'blocked';
+    const requested = await Notifications.requestPermissionsAsync({
+      ios: { allowAlert: true, allowBadge: true, allowSound: true },
+    });
+    if (requested.granted) return 'granted';
+    return requested.canAskAgain ? 'denied' : 'blocked';
+  } catch {
+    return 'blocked';
+  }
+}
+
 /** Requests runtime permission. Returns whether we may post notifications. */
 export async function ensureNotificationPermission(): Promise<boolean> {
   const Notifications = notifications();

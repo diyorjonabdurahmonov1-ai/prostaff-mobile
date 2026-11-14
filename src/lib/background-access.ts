@@ -21,7 +21,7 @@ import { Platform } from 'react-native';
 
 const AUTOSTART_DONE_KEY = 'prostaff.autostart_done';
 
-function appPackage(): string {
+export function appPackage(): string {
   return Constants.expoConfig?.android?.package ?? 'com.prostaff.app';
 }
 
