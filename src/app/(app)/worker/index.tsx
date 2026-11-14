@@ -33,6 +33,7 @@ import type { WorkerProfile } from '@/lib/types';
 import { useAuth } from '@/store/auth';
 import { useAlerts, useWorkerOrders } from '@/store/realtime';
 import { Backdrop } from '@/components/backdrop';
+import { BackgroundAccessCard } from '@/components/background-access-card';
 
 /**
  * The worker's home.
@@ -256,7 +257,9 @@ export default function WorkerPanelScreen() {
         <FadeUp index={1} step={Stagger.card} style={styles.block}>
           {locationBlocked ? (
             <LocationBanner status={location.status} onFix={location.fix} />
-          ) : null}
+          ) : (
+            <BackgroundAccessCard />
+          )}
           <OnlineToggle
             online={online}
             disabled={busy}
