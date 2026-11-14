@@ -23,6 +23,8 @@ interface NativeOverlay {
   ringBubble(label: string): boolean;
   hideBubble(): boolean;
   bringToFront(): boolean;
+  startKeepAlive(title: string, body: string): boolean;
+  stopKeepAlive(): boolean;
 }
 
 const native: NativeOverlay | null =
@@ -81,6 +83,26 @@ export function hideBubble(): void {
 export function bringToFront(): void {
   try {
     native?.bringToFront();
+  } catch {
+    // As above.
+  }
+}
+
+/**
+ * Holds the app's process while a provider is online and nothing else does —
+ * a firm that does not share its location. Shows a standing notification.
+ */
+export function startKeepAlive(title: string, body: string): void {
+  try {
+    native?.startKeepAlive(title, body);
+  } catch {
+    // As above.
+  }
+}
+
+export function stopKeepAlive(): void {
+  try {
+    native?.stopKeepAlive();
   } catch {
     // As above.
   }

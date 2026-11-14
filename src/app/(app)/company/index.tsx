@@ -16,6 +16,8 @@ import { AlertBannerList } from '@/components/alert-banner';
 import { BackgroundAccessCard } from '@/components/background-access-card';
 import { LiveLocationCard } from '@/components/live-location-card';
 import { OnlineToggle } from '@/components/online-toggle';
+import { WorkRequirementsCard } from '@/components/work-requirements-card';
+import { useWorkRequirements } from '@/hooks/use-work-requirements';
 import { PROVIDER_NAV_HEIGHT, ProviderNav } from '@/components/provider-nav';
 import { StatusPill } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -105,7 +107,17 @@ export default function CompanyPanelScreen() {
    * held one job turned away every other customer for the length of it.
    */
 
+  // Without notifications and "display over other apps" an order can arrive and
+  // not be seen, so the switch stays off until they are given. Only once the
+  // first read is in: a screen must not scold on a guess.
+  const requirements = useWorkRequirements();
+  const requirementsMissing = requirements.checked && !requirements.ok;
+
   const setOnline = async (online: boolean) => {
+    if (online && requirementsMissing) {
+      Alert.alert(t('req.needTitle'), t('req.needBody'));
+      return;
+    }
     setToggling(true);
     try {
       await api.post<CompanyProfile>('/company/status', { online });
@@ -127,7 +139,7 @@ export default function CompanyPanelScreen() {
     );
   }
 
-  const online = profile.online;
+  const online = profile.online && !requirementsMissing;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
@@ -156,6 +168,7 @@ export default function CompanyPanelScreen() {
         {/* Availability — the same big switch the worker has: whether orders
             reach the firm is the most consequential setting on this screen. */}
         <View style={styles.toggle}>
+          {requirementsMissing ? <WorkRequirementsCard requirements={requirements} /> : null}
           <OnlineToggle
             online={online}
             disabled={toggling}
@@ -164,7 +177,11 @@ export default function CompanyPanelScreen() {
             offLabel={t('common.offline')}
           />
           <Text style={[Type.footnote, styles.toggleHint, { color: theme.textSecondary }]}>
-            {online ? t('company.onlineHint') : t('company.offlineHint')}
+            {requirementsMissing
+              ? t('req.offHint')
+              : online
+                ? t('company.onlineHint')
+                : t('company.offlineHint')}
           </Text>
         </View>
 
