@@ -25,7 +25,16 @@ import { AppState, Platform } from 'react-native';
 import { api } from '@/lib/api';
 
 /** Android channel the backend also targets via `channelId` on its pushes. */
-export const ORDERS_CHANNEL = 'orders';
+export const ORDERS_CHANNEL = 'orders_v2';
+/**
+ * The channel builds before the three-second ring used. A channel's sound is
+ * fixed when it is created and cannot be changed afterwards, so a new sound is a
+ * new channel — and the server has to be told which one this phone has. The old
+ * one stays registered so a server that has not heard yet still reaches us.
+ */
+const LEGACY_ORDERS_CHANNEL = 'orders';
+/** Whether the order channel above exists on this phone, so it is safe to name. */
+let ordersChannelReady = false;
 
 type NotificationsModule = typeof import('expo-notifications');
 
@@ -210,6 +219,16 @@ async function ensureAndroidChannels() {
   const Notifications = notifications();
   if (!Notifications) return;
   try {
+    await Notifications.setNotificationChannelAsync(LEGACY_ORDERS_CHANNEL, {
+      name: 'Buyurtmalar (eski)',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 800, 500, 800, 500],
+      lightColor: '#534AB7',
+      bypassDnd: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      enableVibrate: true,
+      sound: 'default',
+    });
     await Notifications.setNotificationChannelAsync('default', {
       name: 'Umumiy',
       importance: Notifications.AndroidImportance.HIGH,
@@ -219,13 +238,16 @@ async function ensureAndroidChannels() {
     await Notifications.setNotificationChannelAsync(ORDERS_CHANNEL, {
       name: 'Buyurtmalar',
       importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 800, 500, 800, 500],
+      // Three rings and three buzzes, about three seconds in all: long enough
+      // to be heard over a navigator's voice, short enough not to be a siren.
+      vibrationPattern: [0, 700, 300, 700, 300, 700],
       lightColor: '#534AB7',
       bypassDnd: true,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       enableVibrate: true,
-      sound: 'default',
+      sound: 'order-ring.wav',
     });
+    ordersChannelReady = true;
   } catch {
     // Channel creation is best-effort.
   }
@@ -395,6 +417,9 @@ export async function registerPushToken(): Promise<string | null> {
     await api.post('/me/push-token', {
       ...(token ? { token } : null),
       ...(deviceToken ? { device_token: deviceToken } : null),
+      // Only once the channel really exists: naming one the phone does not have
+      // would file every order under "Miscellaneous", silent.
+      ...(Platform.OS === 'android' && ordersChannelReady ? { channel: ORDERS_CHANNEL } : null),
     });
     if (token) registeredToken = token;
     if (deviceToken) registeredDeviceToken = deviceToken;
@@ -450,7 +475,12 @@ export function startPushRegistration(): () => void {
       Notifications?.addPushTokenListener(({ data }) => {
         if (cancelled || typeof data !== 'string' || !data) return;
         registeredToken = null; // force the POST; the value genuinely changed
-        api.post('/me/push-token', { token: data }).then(
+        api
+          .post('/me/push-token', {
+            token: data,
+            ...(Platform.OS === 'android' && ordersChannelReady ? { channel: ORDERS_CHANNEL } : null),
+          })
+          .then(
           () => {
             registeredToken = data;
           },
