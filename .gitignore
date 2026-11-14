@@ -76,3 +76,7 @@ desktop.ini
 # scratch
 tmp/
 example
+
+# Gradle output of the local native modules
+modules/*/android/build/
+modules/*/android/.gradle/
