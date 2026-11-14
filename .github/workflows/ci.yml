@@ -31,7 +31,7 @@ jobs:
       - run: npm ci
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: bash scripts/typecheck.sh
 
       - name: Lint (no new errors)
         run: bash scripts/lint-ratchet.sh
