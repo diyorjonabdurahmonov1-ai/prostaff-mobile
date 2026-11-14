@@ -84,7 +84,8 @@
         "expo-notifications",
         {
           "sounds": [
-            "./assets/sounds/alarm.wav"
+            "./assets/sounds/alarm.wav",
+            "./assets/sounds/order-ring.wav"
           ],
           "color": "#534AB7",
           "defaultChannel": "orders",
