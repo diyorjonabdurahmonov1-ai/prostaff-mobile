@@ -56,6 +56,40 @@ export function ProfileView({ children }: ProfileViewProps) {
   const { user, activeMode, refreshMe, signOut, setActiveMode } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  /**
+   * Erases the account, as both app stores require. It says plainly what goes —
+   * and what a worker's wallet balance becomes — and only the second, red
+   * button does it. The server refuses while a job is in progress, and its
+   * message (in Uzbek) is shown as it comes.
+   */
+  const askDeleteAccount = () => {
+    const balance = user?.wallet?.balance ?? 0;
+    const message =
+      t('delete.body') + (balance > 0 ? `\n\n${t('delete.balance', { n: formatSom(balance) })}` : '');
+    Alert.alert(t('delete.title'), message, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('delete.confirm'),
+        style: 'destructive',
+        onPress: async () => {
+          setDeleting(true);
+          try {
+            await api.post('/me/delete', { confirm: true });
+            await signOut();
+          } catch (err) {
+            Alert.alert(
+              t('common.error'),
+              err instanceof Error && err.message ? err.message : t('common.genericError'),
+            );
+          } finally {
+            setDeleting(false);
+          }
+        },
+      },
+    ]);
+  };
 
   /**
    * The picker's `file://` URI only resolves on this device, so the photo is
@@ -387,6 +421,15 @@ export function ProfileView({ children }: ProfileViewProps) {
       {/* Sign out */}
       <Section style={styles.section}>
         <Row title={t('profile.signOut')} tone="danger" centered onPress={signOut} />
+      </Section>
+
+      <Section style={styles.section}>
+        <Row
+          title={deleting ? t('common.loading') : t('profile.deleteAccount')}
+          tone="danger"
+          centered
+          onPress={deleting ? undefined : askDeleteAccount}
+        />
       </Section>
 
       <Text style={[Type.caption1, styles.version, { color: theme.textTertiary }]}>
