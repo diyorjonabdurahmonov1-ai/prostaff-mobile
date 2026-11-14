@@ -245,7 +245,7 @@ async function ensureAndroidChannels() {
       bypassDnd: true,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       enableVibrate: true,
-      sound: 'order-ring.wav',
+      sound: 'order_ring.wav',
     });
     ordersChannelReady = true;
   } catch {

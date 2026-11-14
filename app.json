@@ -85,7 +85,7 @@
         {
           "sounds": [
             "./assets/sounds/alarm.wav",
-            "./assets/sounds/order-ring.wav"
+            "./assets/sounds/order_ring.wav"
           ],
           "color": "#534AB7",
           "defaultChannel": "orders",
