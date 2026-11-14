@@ -17,6 +17,9 @@ import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { UpdateGate } from '@/components/update-gate';
+// Imported for its side effect: the background location task has to be
+// defined before anything can start it. See lib/background-location.
+import '@/lib/background-location';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { I18nProvider } from '@/i18n';

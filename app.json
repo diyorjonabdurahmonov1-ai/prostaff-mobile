@@ -12,7 +12,8 @@
       "supportsTablet": false,
       "infoPlist": {
         "UIBackgroundModes": [
-          "remote-notification"
+          "remote-notification",
+          "location"
         ],
         "ITSAppUsesNonExemptEncryption": false,
         "LSApplicationQueriesSchemes": [
@@ -65,7 +66,11 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "PROSTAFF sizga eng yaqin ishchilarni topish uchun joylashuvingizdan foydalanadi."
+          "locationAlwaysAndWhenInUsePermission": "PROSTAFF onlayn ishchilarga yaqin atrofdagi buyurtmalarni yuborish uchun joylashuvingizdan foydalanadi, ilova yopiq turganda ham.",
+          "locationWhenInUsePermission": "PROSTAFF sizga eng yaqin ishchilarni va buyurtmalarni topish uchun joylashuvingizdan foydalanadi.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [

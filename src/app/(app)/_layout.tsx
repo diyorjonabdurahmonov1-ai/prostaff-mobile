@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { CardPaymentHost } from '@/components/card-payment-host';
 import { useTheme } from '@/hooks/use-theme';
 import { useLiveLocation } from '@/hooks/use-live-location';
+import { startBackgroundLocation, stopBackgroundLocation } from '@/lib/background-location';
 import { setLiveLocation } from '@/lib/company-live';
 import { firmMayReport, setFirmLiveIntent, setWorkerIntent, workerMayReport } from '@/lib/presence';
 import { useT } from '@/i18n';
@@ -152,6 +153,18 @@ function WorkerLocationGuard() {
   });
   const blocked = status !== 'ok' && status !== 'checking';
 
+  // The same reports, kept coming once the app is behind another one or the
+  // phone is in a pocket — for exactly as long as the worker is online.
+  const follow = online && status === 'ok';
+  useEffect(() => {
+    if (follow) {
+      startBackgroundLocation('worker', { title: t('bg.workerTitle'), body: t('bg.workerBody') });
+    } else if (status !== 'checking') {
+      stopBackgroundLocation();
+    }
+  }, [follow, status, t]);
+  useEffect(() => () => void stopBackgroundLocation(), []);
+
   const lapseRef = useRef(false);
   useEffect(() => {
     if (!blocked) {
@@ -208,6 +221,17 @@ function CompanyLiveGuard() {
     },
   });
   const blocked = status !== 'ok' && status !== 'checking';
+
+  // A firm on the road is found by where its phone is, screen on or not.
+  const follow = sharing && status === 'ok';
+  useEffect(() => {
+    if (follow) {
+      startBackgroundLocation('company', { title: t('bg.firmTitle'), body: t('bg.firmBody') });
+    } else if (status !== 'checking') {
+      stopBackgroundLocation();
+    }
+  }, [follow, status, t]);
+  useEffect(() => () => void stopBackgroundLocation(), []);
 
   const lapseRef = useRef(false);
   useEffect(() => {
