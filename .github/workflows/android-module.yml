@@ -1,0 +1,54 @@
+# The native code. Kotlin is only compiled by a build, and a build is slow, so
+# this runs when something that could break it changes: the local native
+# modules, the app config that wires them in, or the dependency list.
+name: Android native code
+
+on:
+  pull_request:
+    paths:
+      - "modules/**"
+      - "app.json"
+      - "package.json"
+      - ".github/workflows/android-module.yml"
+  push:
+    branches: [main]
+    paths:
+      - "modules/**"
+      - "app.json"
+      - "package.json"
+
+concurrency:
+  group: android-module-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: npm ci
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: "1"
+
+      - name: Compile the native module
+        working-directory: android
+        run: ./gradlew :prostaff-overlay:compileDebugKotlin --no-daemon --console=plain
+        env:
+          NODE_ENV: development
