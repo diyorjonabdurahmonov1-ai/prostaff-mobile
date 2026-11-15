@@ -29,6 +29,7 @@ import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
 import { api, API_URL, getAuthToken } from '@/lib/api';
+import { getDeviceId } from '@/lib/device-id';
 import { firmMayReport, workerMayReport } from '@/lib/presence';
 
 const TASK = 'prostaff-live-location';
@@ -69,7 +70,11 @@ async function report(mode: BackgroundMode, lat: number, lng: number) {
   if (!token) return;
   await fetch(`${API_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      'X-Device-Id': await getDeviceId(),
+    },
     body: JSON.stringify(body),
   });
 }

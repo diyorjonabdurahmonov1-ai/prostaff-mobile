@@ -22,6 +22,7 @@ import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
 import { api, API_URL, getAuthToken } from '@/lib/api';
+import { getDeviceId } from '@/lib/device-id';
 
 const TASK = 'prostaff-trip-position';
 const ORDER_KEY = 'prostaff.trip_order';
@@ -52,7 +53,11 @@ async function report(orderId: string, lat: number, lng: number): Promise<number
   if (!token) return undefined;
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      'X-Device-Id': await getDeviceId(),
+    },
     body: JSON.stringify({ lat, lng }),
   });
   return res.status;

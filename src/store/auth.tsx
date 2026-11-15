@@ -14,8 +14,11 @@
  */
 
 import * as SecureStore from 'expo-secure-store';
+import { Alert } from 'react-native';
 
+import { stopBackgroundLocation } from '@/lib/background-location';
 import { resetPushToken } from '@/lib/notifications';
+import { setFirmLiveIntent, setWorkerIntent } from '@/lib/presence';
 import { socket } from '@/lib/socket';
 import {
   createContext,
@@ -33,6 +36,7 @@ import {
   setRefreshToken as setApiRefreshToken,
   setAuthToken,
   setOnRefreshFailed,
+  setOnSessionReplaced,
   setOnTokenRefreshed,
 } from '@/lib/api';
 import type {
@@ -238,9 +242,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       doSignOut();
     });
 
+    // Another phone took this account over: say so, the sign-out follows.
+    setOnSessionReplaced((message) => {
+      Alert.alert(message || 'Bu akkaunt boshqa telefonda ochildi. Qayta kiring.');
+    });
+
     return () => {
       setOnTokenRefreshed(null);
       setOnRefreshFailed(null);
+      setOnSessionReplaced(null);
     };
   }, [doSignOut]);
 
@@ -329,6 +339,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token, persistUser, setActiveModeState]);
 
   const signOut = useCallback(async () => {
+    // Pressing "exit" means offline. The server takes a worker or firm offline
+    // when it hears the sign-out; these keep this phone from putting them back
+    // online in the moments before that — a location report still in flight, or
+    // the background service that sends one every minute.
+    setWorkerIntent(false);
+    setFirmLiveIntent(false);
+    stopBackgroundLocation();
     // Notify server to revoke refresh token.
     const rt = await secureGet(REFRESH_TOKEN_KEY);
     if (rt) {
