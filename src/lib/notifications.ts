@@ -35,6 +35,22 @@ export const ORDERS_CHANNEL = 'orders_v2';
 const LEGACY_ORDERS_CHANNEL = 'orders';
 /** Whether the order channel above exists on this phone, so it is safe to name. */
 let ordersChannelReady = false;
+/**
+ * Everyday messages — a role change, a note from the office, a subscription —
+ * ring a soft chime here, not the three-second order ring. A new channel, since
+ * a channel's sound cannot be changed once it exists.
+ */
+export const GENERAL_CHANNEL = 'general_v1';
+let generalChannelReady = false;
+/**
+ * What this phone tells the server about its channels. `orders_v3` is not a
+ * channel: it means "I have orders_v2 and general_v1", so the server may name
+ * the general one (naming a channel the phone lacks files the message silently).
+ */
+function declaredChannel(): string | null {
+  if (Platform.OS !== 'android' || !ordersChannelReady) return null;
+  return generalChannelReady ? 'orders_v3' : ORDERS_CHANNEL;
+}
 
 type NotificationsModule = typeof import('expo-notifications');
 
@@ -189,12 +205,25 @@ export function configureNotifications() {
   // Show the banner even while the app is in the foreground — an incoming job
   // is exactly the case where a silent notification would be useless.
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
+    handleNotification: async (notification) => {
+      // A push for a stored message, arriving while the app is open: the app
+      // shows that message itself (see useNotificationBridge), so showing the
+      // push as well made every message ring twice. Pushes with no stored
+      // message behind them — and every push while the app is closed — are
+      // untouched.
+      const content = notification.request.content;
+      const trigger = notification.request.trigger as { type?: string } | null;
+      const duplicate =
+        trigger?.type === 'push' &&
+        AppState.currentState === 'active' &&
+        typeof (content.data as { notification_id?: unknown } | undefined)?.notification_id === 'string';
+      return {
+        shouldShowBanner: !duplicate,
+        shouldShowList: !duplicate,
+        shouldPlaySound: !duplicate,
+        shouldSetBadge: false,
+      };
+    },
   });
 
   ensureAndroidChannels();
@@ -235,6 +264,14 @@ async function ensureAndroidChannels() {
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#534AB7',
     });
+    await Notifications.setNotificationChannelAsync(GENERAL_CHANNEL, {
+      name: 'Xabarlar',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 200, 120, 200],
+      lightColor: '#534AB7',
+      sound: 'notify_chime.wav',
+    });
+    generalChannelReady = true;
     await Notifications.setNotificationChannelAsync(ORDERS_CHANNEL, {
       name: 'Buyurtmalar',
       importance: Notifications.AndroidImportance.MAX,
@@ -313,6 +350,11 @@ export async function presentLocalNotification(input: {
   body?: string;
   data?: Record<string, unknown>;
 }): Promise<void> {
+  // Only orders ring. Everything else — a role change, a message from the
+  // office — gets the soft chime channel (when this phone has it).
+  const type = typeof input.data?.type === 'string' ? input.data.type : '';
+  const isOrder = type.startsWith('order.') || type === '';
+  const channelId = !isOrder && generalChannelReady ? GENERAL_CHANNEL : ORDERS_CHANNEL;
   const Notifications = notifications();
   if (!Notifications) return;
   try {
@@ -328,7 +370,7 @@ export async function presentLocalNotification(input: {
       trigger:
         Platform.OS === 'android'
           ? ({
-              channelId: ORDERS_CHANNEL,
+              channelId,
               type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
               seconds: 1,
             } as any)
@@ -439,9 +481,9 @@ export async function registerPushToken(): Promise<string | null> {
     await api.post('/me/push-token', {
       ...(token ? { token } : null),
       ...(deviceToken ? { device_token: deviceToken } : null),
-      // Only once the channel really exists: naming one the phone does not have
-      // would file every order under "Miscellaneous", silent.
-      ...(Platform.OS === 'android' && ordersChannelReady ? { channel: ORDERS_CHANNEL } : null),
+      // Only once the channels really exist: naming one the phone does not have
+      // would file every message under "Miscellaneous", silent.
+      ...(declaredChannel() ? { channel: declaredChannel() } : null),
     });
     if (token) registeredToken = token;
     if (deviceToken) registeredDeviceToken = deviceToken;
@@ -500,7 +542,7 @@ export function startPushRegistration(): () => void {
         api
           .post('/me/push-token', {
             token: data,
-            ...(Platform.OS === 'android' && ordersChannelReady ? { channel: ORDERS_CHANNEL } : null),
+            ...(declaredChannel() ? { channel: declaredChannel() } : null),
           })
           .then(
           () => {
