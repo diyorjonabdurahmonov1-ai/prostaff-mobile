@@ -20,7 +20,7 @@ import { Header } from '@/components/ui/header';
 import { Section } from '@/components/ui/list';
 import { Segmented } from '@/components/ui/segmented';
 import { Sheet } from '@/components/ui/sheet';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { Layout, Radius, Squircle, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
@@ -231,7 +231,7 @@ function CompanyOrderCard({
         </Text>
 
         {showMap ? (
-          <YandexMap
+          <AppMap
             point={{ lat: order.lat, lng: order.lng }}
             height={150}
             route={holding}

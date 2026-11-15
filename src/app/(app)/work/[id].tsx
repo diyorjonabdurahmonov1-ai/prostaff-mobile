@@ -30,7 +30,7 @@ import { Row, Section } from '@/components/ui/list';
 import { PhotoSlider } from '@/components/ui/photo-slider';
 import { Screen } from '@/components/ui/screen';
 import { Stars } from '@/components/ui/stars';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { Ease } from '@/constants/motion';
 import { Layout, Radius, Squircle, Type, categoryTint } from '@/constants/theme';
 import { useCategories } from '@/hooks/use-categories';
@@ -279,7 +279,7 @@ export default function WorkDetailScreen() {
 
       {hasCoords(order) ? (
         <View style={styles.mapWrap}>
-          <YandexMap
+          <AppMap
             point={{ lat: order.lat, lng: order.lng }}
             height={200}
             route

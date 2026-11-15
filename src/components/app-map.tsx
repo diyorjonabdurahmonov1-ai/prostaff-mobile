@@ -1,23 +1,17 @@
 /**
- * A real Yandex map, in whichever form the device can actually render.
+ * The app's map: OpenFreeMap tiles drawn by MapLibre GL JS inside a WebView.
  *
- * Two implementations, picked at runtime:
+ * Needs the `react-native-webview` native module. Free, no API key, no account,
+ * no ads. When the map cannot be drawn — the module is missing from the binary,
+ * there is no network, WebGL is unavailable — `MapFallback` shows an address card
+ * with the same hand-off button, so a screen asking for a map always shows
+ * something useful.
  *
- *  1. **Interactive** — the Yandex JS API (2.1) inside a WebView. Needs the
- *     `react-native-webview` native module, so it only appears in a build that
- *     was compiled with it. It does *not* need an API key: the endpoint serves
- *     the library without one, and a key only raises the quota.
- *  2. **Static** — `static-yandex-map.tsx`, a real Yandex map served as a PNG.
- *     No native module, so it still renders in a dev build made before the
- *     WebView was added. Kept as the fallback for when the JS API cannot be
- *     reached at all. Supports pins, the radius ring, zoom and tap-to-pick.
+ * The WebView is required inside a try/catch because importing it without the
+ * native module throws at module scope.
  *
- * The choice is silent: a screen asks for a map and gets the best one available,
- * which is why requiring the WebView is wrapped in a try/catch — importing it
- * without the native module throws at module scope.
- *
- * Modes: **preview** (default; display-only, the card hands off to the Yandex
- * Maps app), **interactive** (pan/zoom stay with the map) and **picker**
+ * Modes: **preview** (default; display-only, the pill hands off to the phone's
+ * maps app), **interactive** (pan/zoom stay with the map) and **picker**
  * (`onPick` reports the coordinate the user chose).
  */
 
@@ -32,7 +26,7 @@ import { Text } from '@/components/text';
 
 import { MapZoom } from '@/components/map-zoom';
 import { Shimmer } from '@/components/motion';
-import { StaticYandexMap } from '@/components/static-yandex-map';
+import { MapFallback } from '@/components/map-fallback';
 import { Icon } from '@/components/ui/icon';
 import { Hairline, Radius, Shadow, Squircle, Type } from '@/constants/theme';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
@@ -43,7 +37,7 @@ import {
   MIN_ZOOM,
   buildMapHtml,
   mapConfigJson,
-  openInYandex,
+  openInMaps,
   zoomForRadius,
   type LatLng,
   type MapMarker,
@@ -57,8 +51,7 @@ export type { MapMarker };
 /**
  * The WebView, if this binary has it. Importing the package evaluates
  * `TurboModuleRegistry.getEnforcing('RNCWebViewModule')`, which throws when the
- * native module is missing — so the require is guarded and a failure simply
- * means the static map is used instead.
+ * native module is missing — so the require is guarded and 
  */
 type WebViewComponent = typeof import('react-native-webview').WebView;
 type WebViewMessage = import('react-native-webview').WebViewMessageEvent;
@@ -73,7 +66,7 @@ const WebView: WebViewComponent | null = (() => {
   }
 })();
 
-export interface YandexMapProps {
+export interface AppMapProps {
   /** Centre of the map and, unless `markers` is given, the single pin. */
   point: LatLng;
   markers?: MapMarker[];
@@ -89,38 +82,37 @@ export interface YandexMapProps {
   route?: boolean;
   /** Small caption pinned to the top-left of the card. */
   caption?: string;
-  /** Hide the "open in Yandex Maps" pill (e.g. while picking a location). */
+  /** Hide the "open in maps" pill (e.g. while picking a location). */
   hideOpenButton?: boolean;
   /**
    * Makes the whole card a button.
    *
    * Nothing happens when a display-only map is tapped unless this is given. It
-   * used to hand off to the Yandex Maps app, so a stray tap while scrolling
+   * used to hand off to the maps app, so a stray tap while scrolling
    * threw the user out of the app entirely — leaving the app is a decision, and
    * the pill in the corner is where it is made.
    */
   onPress?: () => void;
 }
 
-export function YandexMap(props: YandexMapProps) {
+export function AppMap(props: AppMapProps) {
   const resolved = { ...props, zoom: resolveZoom(props) };
-  // No WebView in this binary: the static map is a real map too. A missing API
-  // key is not a reason to fall back — the JS API serves itself without one.
-  if (!WebView) return <StaticYandexMap {...resolved} />;
-  return <InteractiveYandexMap {...resolved} />;
+  // No WebView in this binary: show the address card.
+  if (!WebView) return <MapFallback {...resolved} />;
+  return <InteractiveMap {...resolved} />;
 }
 
 /**
  * A map showing a search radius should open wide enough to show it; a map you
  * are dropping a pin on should open at street level. Callers can still say.
  */
-export function resolveZoom({ zoom, radiusKm, onPick, height = 200, point }: YandexMapProps): number {
+export function resolveZoom({ zoom, radiusKm, onPick, height = 200, point }: AppMapProps): number {
   if (zoom) return zoom;
   if (radiusKm && !onPick) return zoomForRadius(radiusKm, height, point.lat);
   return DEFAULT_ZOOM;
 }
 
-function InteractiveYandexMap({
+function InteractiveMap({
   point,
   markers,
   zoom = DEFAULT_ZOOM,
@@ -132,7 +124,7 @@ function InteractiveYandexMap({
   caption,
   hideOpenButton = false,
   onPress,
-}: YandexMapProps) {
+}: AppMapProps) {
   const t = useT();
   const { lang } = useI18n();
   const theme = useTheme();
@@ -169,7 +161,7 @@ function InteractiveYandexMap({
    * The document is built once and then *updated*.
    *
    * It used to be rebuilt whenever the centre changed, which remounts the
-   * WebView and re-downloads the entire Yandex JS API — a visible stall every
+   * WebView and re-downloads the entire map library — a visible stall every
    * time the pin moved. Now the initial view is captured here and every later
    * change is injected into the running map.
    */
@@ -260,11 +252,10 @@ function InteractiveYandexMap({
     }
   };
 
-  // The JS API did not load (bad key, no network): drop to the static map,
-  // which is served by a different endpoint and needs no key.
+  // The map did not load (no network, tiles unreachable): show the address card.
   if (failed || !WebView) {
     return (
-      <StaticYandexMap
+      <MapFallback
         point={point}
         markers={markers}
         // Whatever the user had reached before the JS API gave up, so falling
@@ -313,10 +304,10 @@ function InteractiveYandexMap({
           setSupportMultipleWindows={false}
           /**
            * Nothing may navigate this card away from the map — and nothing may
-           * leave the app on its own either. Yandex's own tiles are full of
-           * links (POI labels, the logo, the terms line); handing those to
+           * leave the app on its own either. The map's attribution line is
+           * full of links; handing those to
            * `Linking` meant a tap anywhere near one closed the app and opened
-           * Yandex Maps, which is not what tapping a map on a profile means.
+           * a browser, which is not what tapping a map on a profile means.
            * The navigation is simply refused and the map stays put.
            */
           onShouldStartLoadWithRequest={(request) => {
@@ -344,7 +335,7 @@ function InteractiveYandexMap({
         />
       ) : null}
 
-      {/* Chrome matches the static card exactly, so the two are indistinguishable. */}
+      
       {caption ? (
         <View
           style={[
@@ -383,9 +374,9 @@ function InteractiveYandexMap({
           </Text>
         </View>
       ) : hideOpenButton ? null : (
-        // Bottom-left: Yandex's watermark owns the opposite corner.
+        // Bottom-left: the map's attribution owns the opposite corner.
         <Pressable
-          onPress={() => openInYandex(point, route)}
+          onPress={() => openInMaps(point, route)}
           style={({ pressed }) => [
             styles.action,
             dark ? null : Shadow.card,

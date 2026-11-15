@@ -18,7 +18,7 @@ import { EmptyState, LoadingState } from '@/components/ui/empty-state';
 import { Header } from '@/components/ui/header';
 import { Section } from '@/components/ui/list';
 import { Segmented } from '@/components/ui/segmented';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { Layout, Radius, Squircle, Type } from '@/constants/theme';
 import { useCategories } from '@/hooks/use-categories';
 import { useTheme } from '@/hooks/use-theme';
@@ -173,7 +173,7 @@ function OrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
         ) : null}
 
         {showMap ? (
-          <YandexMap
+          <AppMap
             point={{ lat: order.lat, lng: order.lng }}
             height={150}
             route

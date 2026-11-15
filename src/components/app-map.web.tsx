@@ -1,5 +1,5 @@
 /**
- * The web twin of `yandex-map.tsx`.
+ * The web twin of `app-map.tsx`.
  *
  * `react-native-webview` has no browser implementation, so on web the very same
  * map document (`buildMapHtml`) goes into an iframe instead. Picking works the
@@ -17,7 +17,7 @@ import { Text } from '@/components/text';
 
 import { MapZoom } from '@/components/map-zoom';
 import { Shimmer } from '@/components/motion';
-import { StaticYandexMap } from '@/components/static-yandex-map';
+import { MapFallback } from '@/components/map-fallback';
 import { Icon } from '@/components/ui/icon';
 import { Hairline, Radius, Shadow, Squircle, Type } from '@/constants/theme';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
@@ -27,22 +27,22 @@ import {
   MAX_ZOOM,
   MIN_ZOOM,
   buildMapHtml,
-  openInYandex,
+  openInMaps,
   type MapMarker,
 } from '@/lib/maps';
 
-import { LOAD_TIMEOUT_MS, resolveZoom } from './yandex-map';
+import { LOAD_TIMEOUT_MS, resolveZoom } from './app-map';
 
-import type { YandexMapProps } from './yandex-map';
+import type { AppMapProps } from './app-map';
 
 export type { MapMarker };
 
-export function YandexMap(props: YandexMapProps) {
+export function AppMap(props: AppMapProps) {
   const resolved = { ...props, zoom: resolveZoom(props) };
-  return <InteractiveYandexMap {...resolved} />;
+  return <InteractiveMap {...resolved} />;
 }
 
-function InteractiveYandexMap({
+function InteractiveMap({
   point,
   markers,
   zoom = DEFAULT_ZOOM,
@@ -54,7 +54,7 @@ function InteractiveYandexMap({
   caption,
   hideOpenButton = false,
   onPress,
-}: YandexMapProps) {
+}: AppMapProps) {
   const t = useT();
   const { lang } = useI18n();
   const theme = useTheme();
@@ -114,7 +114,7 @@ function InteractiveYandexMap({
   );
 
   // Same deadline as native: a JS API that never arrives must not leave the
-  // card shimmering, it must hand over to the static map.
+  // card shimmering, it must hand over to the address card.
   useEffect(() => {
     if (ready || failed) return;
     const id = setTimeout(() => setFailed(true), LOAD_TIMEOUT_MS);
@@ -151,7 +151,7 @@ function InteractiveYandexMap({
 
   if (failed) {
     return (
-      <StaticYandexMap
+      <MapFallback
         point={point}
         markers={markers}
         zoom={zoomLevel}
@@ -178,7 +178,7 @@ function InteractiveYandexMap({
       <View style={StyleSheet.absoluteFill} pointerEvents={canPan ? 'auto' : 'none'}>
         <iframe
           ref={frameRef}
-          title="Yandex map"
+          title="Map"
           srcDoc={html}
           style={{ width: '100%', height: '100%', border: 'none' }}
         />
@@ -239,7 +239,7 @@ function InteractiveYandexMap({
         </View>
       ) : hideOpenButton ? null : (
         <Pressable
-          onPress={() => openInYandex(point, route)}
+          onPress={() => openInMaps(point, route)}
           style={({ pressed }) => [
             styles.action,
             dark ? null : Shadow.card,

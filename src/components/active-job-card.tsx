@@ -22,7 +22,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { Gradients, Radius, Squircle, Type } from '@/constants/theme';
 import { useCategories } from '@/hooks/use-categories';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
@@ -30,7 +30,7 @@ import { useI18n, useT } from '@/i18n';
 import { api } from '@/lib/api';
 import { categoryIcon } from '@/lib/category-icon';
 import { categoryName, formatSom, telUrl } from '@/lib/format';
-import { hasCoords, openInYandex } from '@/lib/maps';
+import { hasCoords, openInMaps } from '@/lib/maps';
 import type { Order, OrderCustomer } from '@/lib/types';
 
 type Ending = 'complete' | 'cancel';
@@ -228,17 +228,17 @@ export function ActiveJobCard({
           </View>
         )}
 
-        {/* ---- Where ---- The same Yandex map the rest of the app uses; a tap
-            anywhere on it, or on its "Yo'l ko'rsatish" pill, asks Yandex for
-            directions. */}
+        {/* ---- Where ---- The same map the rest of the app uses; a tap
+            anywhere on it, or on its "Yo'l ko'rsatish" pill, opens directions
+            in the phone's maps app. */}
         {point && !gathering ? (
           <View style={styles.mapBlock}>
-            <YandexMap
+            <AppMap
               point={point}
               height={150}
               route
               caption={t('order.location')}
-              onPress={() => openInYandex(point, true)}
+              onPress={() => openInMaps(point, true)}
             />
           </View>
         ) : null}

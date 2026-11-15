@@ -10,7 +10,7 @@ import { Text } from '@/components/text';
 
 import { LocationPicker } from '@/components/location-picker';
 import { FadeUp } from '@/components/motion';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { Button } from '@/components/ui/button';
 import { SelectableChip } from '@/components/ui/chip';
 import { Header } from '@/components/ui/header';
@@ -295,7 +295,7 @@ export default function DetailsScreen() {
             gesture, and the page could only be scrolled from beside the card. */}
         <FadeUp index={6} step={Stagger.list} style={styles.field}>
           <Caption>{t('order.location')}</Caption>
-          <YandexMap
+          <AppMap
             point={{ lat: draft.lat, lng: draft.lng }}
             height={220}
             caption={t('map.edit')}

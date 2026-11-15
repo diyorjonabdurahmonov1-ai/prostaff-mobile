@@ -74,9 +74,8 @@ src/
   components/brand-mark.tsx              the logo (briefcase merged into a location pin)
   components/online-toggle.tsx           the worker availability pill
   components/balance-card.tsx            wallet hero with count-up + shimmer
-  components/yandex-map.tsx              real Yandex map — WebView when available (.web.tsx = iframe)
-  components/static-yandex-map.tsx       keyless fallback: the map as an image, drag to pick
-  components/map-pin.tsx                 the product's own pin — no Yandex balloons anywhere
+  components/app-map.tsx                 the map — OpenFreeMap + MapLibre in a WebView (.web.tsx = iframe)
+  components/map-fallback.tsx            address card shown when the map cannot be drawn
   components/incoming-order-card.tsx     an incoming job as a list card (map, pay, countdown bar)
   store/                   auth · order-flow · realtime (polling)
   i18n/                    uz (default) · ru · en dictionaries
@@ -99,25 +98,20 @@ src/
   wake-up needs a dev build + FCM/APNs credentials (out of scope for Expo Go).
 - **Location**: `expo-location` with a graceful fallback to central Tashkent when permission is
   denied (useful on simulators).
-- **Maps are real Yandex maps, in two forms.** `components/yandex-map.tsx` picks at runtime:
-  - *Static* (`static-yandex-map.tsx`) — the Yandex static-map endpoint as a PNG. **No API key and
-    no native module**, so it renders in Expo Go and in any dev build, including one compiled before
-    `react-native-webview` existed. Pins, the 15 km ring, zoom buttons and tap-to-pick all work
-    (picking inverts the Web-Mercator projection, so a tap is a coordinate).
-  - *Interactive* — the Yandex JS API 2.1 in a WebView (an `<iframe>` on web), used only when
-    `EXPO_PUBLIC_YANDEX_MAPS_API_KEY` is set **and** the WebView native module is in the binary.
-    Adding the key alone is not enough: run `npx expo run:android` (or an EAS build) so the module
-    is compiled in, otherwise the require fails and the static map is used.
-
-  Either way the "open in Yandex Maps / directions" hand-off works — deep links need no key.
-
-  **Nothing on the map is Yandex's furniture.** The image is requested as bare cartography (no
-  `pt=` pins, no `pl=` overlays) and the JS-API map runs with `controls: []`; marks, the radius
-  ring and the chrome are the app's own — `map-pin.tsx` for every pin, hairline-bordered chips for
-  the caption and controls, and the action pill parked bottom-**left** so Yandex's watermark keeps
-  its corner. `onPick` turns the map into a picker: the pin is fixed at the centre and you drag the
-  map under it, taxi-app style. A map asked to show a radius opens at the zoom where that radius
-  fits (`zoomForRadius`), because a 15 km ring on a street-level map is invisible.
+- **Maps are OpenFreeMap tiles drawn by MapLibre GL JS.** `components/app-map.tsx` renders one
+  self-contained HTML page (`buildMapHtml` in `lib/maps.ts`) in a WebView (an `<iframe>` on web).
+  Free, no API key, no account, no cookies, no ads, no request limit on the public instance. The
+  "© OpenStreetMap / OpenFreeMap" attribution is shown on the map, as both projects require.
+  - The tile source is **one constant**, `MAP_STYLE_URL` in `lib/maps.ts`; MapLibre is pinned to an
+    exact version (`MAPLIBRE_VERSION`). OpenFreeMap has no SLA — if it ever matters, self-host it
+    (or any MapLibre-compatible style) and change that one line.
+  - If the map cannot load (no network, no WebGL, no WebView module) `map-fallback.tsx` shows an
+    address card with the same hand-off button instead of a grey box.
+  - "Directions" / "Open" hand the point to the phone's own default maps app (`openInMaps`:
+    `geo:` on Android, Apple Maps on iOS, OpenStreetMap in a browser) — no app is forced.
+  - `onPick` turns the map into a picker: the pin is fixed at the centre and you drag the map under
+    it, taxi-app style. A map asked to show a radius opens at the zoom where that radius fits
+    (`zoomForRadius`), because a 15 km ring on a street-level map is invisible.
 - **Bundle identifiers were left alone** (`com.prostaff.app` / `com.anonymous.mobile`). Changing
   them orphans the EAS project, the push credentials and every existing install, so that is a
   release decision rather than a rebrand one. The display name, scheme, icons and splash are all

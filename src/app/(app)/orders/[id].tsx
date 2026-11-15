@@ -16,7 +16,7 @@ import { Header } from '@/components/ui/header';
 import { Row, Section } from '@/components/ui/list';
 import { PhotoSlider } from '@/components/ui/photo-slider';
 import { Screen } from '@/components/ui/screen';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { Layout, Radius, Squircle, Type } from '@/constants/theme';
 import { useCategories } from '@/hooks/use-categories';
 import { useRefresh } from '@/hooks/use-refresh';
@@ -400,7 +400,7 @@ export default function OrderDetailScreen() {
       {hasCoords(order) ? (
         <View style={styles.mapWrap}>
           {/* The worker gets directions; the customer just sees the address. */}
-          <YandexMap
+          <AppMap
             point={{ lat: order.lat, lng: order.lng }}
             height={180}
             route={!isCustomer}

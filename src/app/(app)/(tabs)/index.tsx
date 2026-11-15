@@ -37,7 +37,7 @@ import {
   ServicesGrid,
 } from '@/components/home-sections';
 import { OnlineCompaniesCarousel } from '@/components/online-companies-carousel';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { useCategories } from '@/hooks/use-categories';
 import { useRefresh } from '@/hooks/use-refresh';
 import { useTheme } from '@/hooks/use-theme';
@@ -633,7 +633,7 @@ function CompaniesListScreen({ onBack }: { onBack: () => void }) {
             the ones that never dropped a pin (they would land at 0,0). */}
         {center && pinnedCompanies.length > 0 ? (
           <View style={styles.mapWrap}>
-            <YandexMap
+            <AppMap
               point={center}
               height={200}
               radiusKm={radiusKm}
@@ -867,7 +867,7 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
             margins beside it. The list underneath is how you explore. */}
         {center && workers.length > 0 ? (
           <View style={styles.mapWrap}>
-            <YandexMap
+            <AppMap
               point={center}
               height={200}
               radiusKm={radiusKm}

@@ -24,7 +24,7 @@ import { PhotoGallery } from '@/components/ui/photo-gallery';
 import { Screen } from '@/components/ui/screen';
 import { Stars } from '@/components/ui/stars';
 import { TextField } from '@/components/ui/text-field';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { Layout, Radius, Squircle, Type } from '@/constants/theme';
 import { useRefresh } from '@/hooks/use-refresh';
 import { useTheme } from '@/hooks/use-theme';
@@ -369,7 +369,7 @@ export default function CompanyDetailScreen() {
         <View style={styles.mapWrap}>
           {/* Both places on one map, labelled, so a customer is never left
               wondering which pin the firm will come from. */}
-          <YandexMap
+          <AppMap
             point={
               live
                 ? { lat: company.live_lat!, lng: company.live_lng! }
@@ -458,7 +458,7 @@ export default function CompanyDetailScreen() {
               the full-screen picker, which is the only place a drag on a map
               cannot be mistaken for a drag on the form. */}
           {coords ? (
-            <YandexMap
+            <AppMap
               point={{ lat: coords.lat, lng: coords.lng }}
               height={200}
               caption={t('map.edit')}
