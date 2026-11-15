@@ -130,6 +130,13 @@ export interface MapMarker extends LatLng {
   hint?: string;
   /** Marker colour — defaults to the brand pin. */
   color?: 'primary' | 'success' | 'warning';
+  /**
+   * Initials. Given one, the marker is a round "person" bubble instead of the
+   * plain pin — what a worker on the map looks like.
+   */
+  label?: string;
+  /** Draws the green "online" dot on a bubble. */
+  online?: boolean;
 }
 
 const PIN_COLORS: Record<NonNullable<MapMarker['color']>, string> = {
@@ -165,6 +172,8 @@ export function mapConfigJson(options: {
         coords: [m.lat, m.lng],
         hint: m.hint ?? '',
         color: PIN_COLORS[m.color ?? 'primary'],
+        label: m.label ?? '',
+        online: !!m.online,
       })),
     })
       // Pin labels are user-entered; a stray "</script>" must not end the block.
@@ -221,6 +230,21 @@ export function buildMapHtml(options: {
       pointer-events: none; z-index: 4; transition: all .12s ease-out;
     }
     #shadow.lifted { width: 18px; margin-left: -9px; background: rgba(0,0,0,.18); }
+    /* A worker: a round initials badge on a little stalk, with an online dot. */
+    /* No position or transform here: MapLibre positions the marker element itself. */
+    .bubble { width: 44px; height: 54px; cursor: pointer; }
+    .bubble .face { position: absolute; left: 0; top: 0; width: 38px; height: 38px;
+      border-radius: 50%; border: 3px solid #fff; color: #fff; font: 700 14px/32px sans-serif;
+      text-align: center; box-shadow: 0 4px 12px rgba(10,10,10,.28);
+      animation: pop .35s cubic-bezier(.2,1.4,.4,1) both; }
+    .bubble .tail { position: absolute; left: 14px; top: 34px; width: 12px; height: 12px;
+      transform: rotate(45deg); border-radius: 2px; box-shadow: 2px 2px 4px rgba(10,10,10,.18); }
+    .bubble .dot { position: absolute; left: 28px; top: 28px; width: 12px; height: 12px;
+      border-radius: 50%; background: #12B76A; border: 2px solid #fff; }
+    .bubble .face, .bubble .tail { background: var(--c); }
+    @keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+    .maplibregl-popup-content { border-radius: 12px; padding: 7px 11px; font: 600 12px sans-serif;
+      box-shadow: 0 6px 18px rgba(10,10,10,.2); }
   </style>
 </head>
 <body>
@@ -306,14 +330,33 @@ export function buildMapHtml(options: {
       function drawPins(list) {
         markers.forEach(function (m) { m.remove(); });
         markers = list.map(function (m) {
-          var el = document.createElement('img');
-          el.src = pinSvg(m.color);
-          el.style.width = '34px';
-          el.style.height = '42px';
+          var el;
+          if (m.label) {
+            el = document.createElement('div');
+            el.className = 'bubble';
+            el.style.setProperty('--c', m.color);
+            var face = document.createElement('div');
+            face.className = 'face';
+            face.textContent = m.label;
+            var tail = document.createElement('div');
+            tail.className = 'tail';
+            el.appendChild(tail);
+            el.appendChild(face);
+            if (m.online) {
+              var dot = document.createElement('div');
+              dot.className = 'dot';
+              el.appendChild(dot);
+            }
+          } else {
+            el = document.createElement('img');
+            el.src = pinSvg(m.color);
+            el.style.width = '34px';
+            el.style.height = '42px';
+          }
           var marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
             .setLngLat([m.coords[1], m.coords[0]]);
           if (m.hint) {
-            marker.setPopup(new maplibregl.Popup({ offset: 40, closeButton: false }).setText(m.hint));
+            marker.setPopup(new maplibregl.Popup({ offset: 46, closeButton: false }).setText(m.hint));
           }
           return marker.addTo(map);
         });

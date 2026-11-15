@@ -20,11 +20,13 @@ import { Header } from '@/components/ui/header';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Row, Section } from '@/components/ui/list';
 import { Stars } from '@/components/ui/stars';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   Hairline,
   Layout,
   MaxContentWidth,
   Radius,
+  Shadow,
   Squircle,
   Type,
 } from '@/constants/theme';
@@ -40,7 +42,7 @@ import { OnlineCompaniesCarousel } from '@/components/online-companies-carousel'
 import { AppMap } from '@/components/app-map';
 import { useCategories } from '@/hooks/use-categories';
 import { useRefresh } from '@/hooks/use-refresh';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { useI18n, useT } from '@/i18n';
 import { api } from '@/lib/api';
 import { categoryName } from '@/lib/format';
@@ -367,6 +369,7 @@ function ResultCard({
   onToggle?: () => void;
 }) {
   const theme = useTheme();
+  const dark = useThemeMode() === 'dark';
   const width = useColumnWidth();
 
   return (
@@ -375,12 +378,20 @@ function ResultCard({
         style={[
           styles.card,
           Squircle,
+          dark ? null : Shadow.card,
           { backgroundColor: theme.surface },
           // A ring rather than a tint: the photo is the subject of this tile and
           // washing it in blue is the one change that would make the chosen
           // workers harder to tell apart than the unchosen ones.
           selected ? { borderColor: theme.primary, borderWidth: 2, paddingVertical: 14 } : null,
         ]}>
+        {/* A soft colour wash behind the photo, so the tile has a head instead of
+            being a floating circle on a flat rectangle. */}
+        <LinearGradient
+          colors={[theme.primarySoft, 'transparent']}
+          style={styles.cardWash}
+          pointerEvents="none"
+        />
         {selectable ? (
           <Pressable
             onPress={onToggle}
@@ -393,14 +404,16 @@ function ResultCard({
               styles.check,
               selected
                 ? { backgroundColor: theme.primary, borderColor: theme.primary }
-                : { borderColor: theme.textQuaternary },
+                : { borderColor: theme.textQuaternary, backgroundColor: theme.surface },
               pressed ? styles.pressed : null,
             ]}>
             {selected ? <Icon name="checkmark" size={13} color={theme.onPrimary} /> : null}
           </Pressable>
         ) : null}
 
-        <Avatar name={name} imageUrl={imageUrl} size={64} online={online} />
+        <View style={[styles.avatarRing, { backgroundColor: theme.surface }]}>
+          <Avatar name={name} imageUrl={imageUrl} size={68} online={online} />
+        </View>
 
         <Text style={[Type.subheadEmphasized, styles.cardName, { color: theme.text }]} numberOfLines={1}>
           {name}
@@ -869,13 +882,16 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
           <View style={styles.mapWrap}>
             <AppMap
               point={center}
-              height={200}
+              height={280}
               radiusKm={radiusKm}
               markers={workers.map((w) => ({
                 lat: w.lat,
                 lng: w.lng,
                 hint: w.full_name,
-                color: 'success' as const,
+                // A person, not a dot: initials in a bubble, green dot if online.
+                label: w.full_name.trim().split(/\s+/).slice(0, 2).map((s) => s.charAt(0).toUpperCase()).join(''),
+                online: w.online,
+                color: w.online ? ('success' as const) : ('primary' as const),
               }))}
               caption={`${workers.length} ${t('customer.workers').toLowerCase()}`}
             />
@@ -1043,12 +1059,16 @@ const styles = StyleSheet.create({
   // its surface stopping mid-row.
   card: {
     flex: 1,
-    borderRadius: Radius.card,
+    borderRadius: 24,
+    overflow: 'hidden',
     paddingHorizontal: 12,
-    paddingVertical: 16,
+    paddingTop: 18,
+    paddingBottom: 16,
     alignItems: 'center',
     gap: 6,
   },
+  cardWash: { position: 'absolute', top: 0, left: 0, right: 0, height: 84 },
+  avatarRing: { padding: 3, borderRadius: 40 },
   cardName: { textAlign: 'center' },
   cardMeta: { textAlign: 'center', minHeight: 32 },
   badge: {
