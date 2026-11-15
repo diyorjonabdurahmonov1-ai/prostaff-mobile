@@ -16,7 +16,9 @@
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
+import { stopBackgroundLocation } from '@/lib/background-location';
 import { resetPushToken } from '@/lib/notifications';
+import { setFirmLiveIntent, setWorkerIntent } from '@/lib/presence';
 import { socket } from '@/lib/socket';
 import {
   createContext,
@@ -337,6 +339,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token, persistUser, setActiveModeState]);
 
   const signOut = useCallback(async () => {
+    // Pressing "exit" means offline. The server takes a worker or firm offline
+    // when it hears the sign-out; these keep this phone from putting them back
+    // online in the moments before that — a location report still in flight, or
+    // the background service that sends one every minute.
+    setWorkerIntent(false);
+    setFirmLiveIntent(false);
+    stopBackgroundLocation();
     // Notify server to revoke refresh token.
     const rt = await secureGet(REFRESH_TOKEN_KEY);
     if (rt) {
