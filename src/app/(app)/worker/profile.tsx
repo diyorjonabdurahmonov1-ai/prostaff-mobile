@@ -1,7 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { Text } from '@/components/text';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProfileView } from '@/components/profile-view';
@@ -11,7 +10,6 @@ import { Header } from '@/components/ui/header';
 import { Chip } from '@/components/ui/chip';
 import { Row, Section } from '@/components/ui/list';
 import { PhotoGallery } from '@/components/ui/photo-gallery';
-import { Layout, Type } from '@/constants/theme';
 import { useCategories } from '@/hooks/use-categories';
 import { useTheme } from '@/hooks/use-theme';
 import { useI18n, useT } from '@/i18n';
@@ -157,11 +155,7 @@ export default function WorkerProfileScreen() {
                 />
               </Section>
             </>
-          ) : (
-            <Text style={[Type.footnote, styles.empty, { color: theme.textSecondary }]}>
-              {t('provider.adminOnlyHint')}
-            </Text>
-          )}
+          ) : null}
         </ProfileView>
       </ScrollView>
 
@@ -175,5 +169,4 @@ const styles = StyleSheet.create({
   scroll: { paddingTop: 12 },
   section: { marginTop: 28 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 14 },
-  empty: { paddingHorizontal: Layout.gutter + 4, marginTop: 20 },
 });

@@ -1,4 +1,3 @@
-import { Text } from '@/components/text';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
@@ -10,7 +9,6 @@ import { Avatar } from '@/components/ui/avatar';
 import { Header } from '@/components/ui/header';
 import { Row, Section } from '@/components/ui/list';
 import { PhotoGallery } from '@/components/ui/photo-gallery';
-import { Layout, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { formatSom } from '@/lib/format';
@@ -142,11 +140,7 @@ export default function CompanyProfileScreen() {
                 />
               </Section>
             </>
-          ) : (
-            <Text style={[Type.footnote, styles.empty, { color: theme.textSecondary }]}>
-              {t('provider.adminOnlyHint')}
-            </Text>
-          )}
+          ) : null}
         </ProfileView>
       </ScrollView>
 
@@ -159,5 +153,4 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { paddingTop: 12 },
   section: { marginTop: 28 },
-  empty: { paddingHorizontal: Layout.gutter + 4, marginTop: 20 },
 });
