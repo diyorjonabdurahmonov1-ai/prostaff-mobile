@@ -36,12 +36,17 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.VIBRATE",
         "android.permission.WAKE_LOCK",
-        "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "web": {
@@ -63,7 +68,12 @@
           }
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       [
         "expo-location",
         {
@@ -71,13 +81,17 @@
           "locationWhenInUsePermission": "PROSTAFF sizga eng yaqin ishchilarni va buyurtmalarni topish uchun joylashuvingizdan foydalanadi.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": false,
-          "isAndroidForegroundServiceEnabled": true
+          "isAndroidForegroundServiceEnabled": true,
+          "locationAlwaysPermission": "PROSTAFF onlayn ishchilarga yaqin atrofdagi buyurtmalarni yuborish uchun joylashuvingizdan foydalanadi, ilova yopiq turganda ham.",
+          "motionUsagePermission": false
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "PROSTAFF buyurtmaga rasm biriktirish uchun galereyaga ruxsat so'raydi."
+          "photosPermission": "PROSTAFF buyurtmaga rasm biriktirish uchun galereyaga ruxsat so'raydi.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
       [
@@ -92,7 +106,6 @@
           "enableBackgroundRemoteNotifications": true
         }
       ],
-      "expo-audio",
       "expo-image",
       "expo-asset"
     ],
