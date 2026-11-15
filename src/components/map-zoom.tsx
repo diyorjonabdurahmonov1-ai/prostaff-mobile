@@ -1,11 +1,8 @@
 /**
  * The +/− pill that sits on a map card.
  *
- * Shared by both map implementations on purpose. The interactive card and the
- * static one are meant to be indistinguishable — a phone that cannot load the
- * Yandex JS API falls back to the PNG map and the user should never be able to
- * tell — and two copies of this control would have drifted apart the first time
- * one of them was touched.
+ * Shared by the native and web map cards on purpose: two copies of this control
+ * would have drifted apart the first time one of them was touched.
  *
  * Pinch already zooms the interactive map. The buttons are here anyway: pinching
  * inside a card that lives in a scrolling page is a fight between two gestures,
@@ -73,7 +70,7 @@ function ZoomButton({
   );
 }
 
-/** Yandex's watermark lives bottom-right, so the chrome keeps off that corner. */
+/** Inset of the chrome from the card edge; the attribution owns bottom-right. */
 export const MAP_INSET = 10;
 
 const styles = StyleSheet.create({

@@ -16,7 +16,7 @@ import { Icon } from '@/components/ui/icon';
 import { ImageStrip } from '@/components/ui/image-strip';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
@@ -274,7 +274,7 @@ export default function CompanyOnboardingScreen() {
           <Text style={[Type.footnote, styles.label, { color: theme.textSecondary }]}>
             {t('company.location').toUpperCase()}
           </Text>
-          <YandexMap
+          <AppMap
             point={{ lat: Number(lat) || TASHKENT.lat, lng: Number(lng) || TASHKENT.lng }}
             height={200}
             caption={t('map.edit')}

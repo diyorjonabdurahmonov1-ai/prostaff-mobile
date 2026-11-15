@@ -17,8 +17,6 @@
         ],
         "ITSAppUsesNonExemptEncryption": false,
         "LSApplicationQueriesSchemes": [
-          "yandexmaps",
-          "yandexnavi",
           "tg"
         ]
       }

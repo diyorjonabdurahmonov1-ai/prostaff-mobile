@@ -15,7 +15,7 @@ import { Row, Section } from '@/components/ui/list';
 import { PhotoGallery } from '@/components/ui/photo-gallery';
 import { Screen } from '@/components/ui/screen';
 import { Stars } from '@/components/ui/stars';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { Layout, Radius, Squircle, Type } from '@/constants/theme';
 import { useCategories } from '@/hooks/use-categories';
 import { useRefresh } from '@/hooks/use-refresh';
@@ -212,7 +212,7 @@ export default function WorkerDetailScreen() {
       {/* Where they work from — the 15 km ring is the area they can be called to. */}
       {hasCoords(worker) ? (
         <View style={styles.mapWrap}>
-          <YandexMap
+          <AppMap
             point={{ lat: worker.lat, lng: worker.lng }}
             height={180}
             radiusKm={15}

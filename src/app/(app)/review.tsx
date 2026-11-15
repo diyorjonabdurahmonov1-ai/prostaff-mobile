@@ -8,7 +8,7 @@ import {
 import { Text } from '@/components/text';
 
 import { Button } from '@/components/ui/button';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { Header } from '@/components/ui/header';
 import { Row, Section } from '@/components/ui/list';
 import { PhotoSlider } from '@/components/ui/photo-slider';
@@ -230,7 +230,7 @@ export default function ReviewScreen() {
 
       {/* Last look at where the worker is being sent. */}
       <View style={styles.mapWrap}>
-        <YandexMap point={{ lat: draft.lat, lng: draft.lng }} height={170} />
+        <AppMap point={{ lat: draft.lat, lng: draft.lng }} height={170} />
       </View>
 
       {/* Everything the worker will be shown, at a size worth checking. */}

@@ -22,7 +22,7 @@ import { Text } from '@/components/text';
 
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/ui/header';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { Hairline, Layout, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
@@ -82,7 +82,7 @@ function PickerBody({
 
       <View style={styles.mapWrap} onLayout={(e) => setMapHeight(e.nativeEvent.layout.height)}>
         {mapHeight > 0 ? (
-          <YandexMap point={draft} height={mapHeight} onPick={setDraft} hideOpenButton />
+          <AppMap point={draft} height={mapHeight} onPick={setDraft} hideOpenButton />
         ) : null}
       </View>
 

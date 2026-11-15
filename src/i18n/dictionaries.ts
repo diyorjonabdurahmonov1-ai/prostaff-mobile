@@ -486,7 +486,8 @@ export const uz = {
   'push.hoursAgo': '{n} soat oldin',
 
   // map
-  'map.open': 'Yandex Xaritada',
+  'map.open': 'Xaritada ochish',
+  'map.unavailable': 'Xarita yuklanmadi — internetni tekshiring',
   'map.route': "Yo'l ko'rsatish",
   'map.pickHint': 'Manzilni tanlash uchun xaritani suring',
   'map.openHint': 'Xaritani ochish uchun bosing',
@@ -1199,7 +1200,8 @@ export const ru: Dictionary = {
   'push.minutesAgo': '{n} мин назад',
   'push.hoursAgo': '{n} ч назад',
 
-  'map.open': 'В Яндекс Картах',
+  'map.open': 'Открыть в картах',
+  'map.unavailable': 'Карта не загрузилась — проверьте интернет',
   'map.route': 'Построить маршрут',
   'map.pickHint': 'Двигайте карту, чтобы выбрать адрес',
   'map.openHint': 'Нажмите, чтобы открыть карту',
@@ -1888,7 +1890,8 @@ export const en: Dictionary = {
   'push.minutesAgo': '{n} min ago',
   'push.hoursAgo': '{n} h ago',
 
-  'map.open': 'Open in Yandex Maps',
+  'map.open': 'Open in Maps',
+  'map.unavailable': 'Map did not load — check your connection',
   'map.route': 'Directions',
   'map.pickHint': 'Drag the map to set the address',
   'map.openHint': 'Tap to open the map',

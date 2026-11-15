@@ -28,7 +28,7 @@ import { Layout, Radius, Squircle, Type } from '@/constants/theme';
 import { useRefresh } from '@/hooks/use-refresh';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { hasCoords } from '@/lib/maps';
 import { api } from '@/lib/api';
 import { formatSom, telUrl } from '@/lib/format';
@@ -317,7 +317,7 @@ export default function CompanyPanelScreen() {
                         whether it can get there, and a pair of raw coordinates
                         answered nothing. */}
                     {hasCoords(order) ? (
-                      <YandexMap
+                      <AppMap
                         point={{ lat: order.lat, lng: order.lng }}
                         height={140}
                         caption={t('order.location')}

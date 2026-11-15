@@ -15,7 +15,7 @@ import { Header } from '@/components/ui/header';
 import { Row, Section } from '@/components/ui/list';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
-import { YandexMap } from '@/components/yandex-map';
+import { AppMap } from '@/components/app-map';
 import { Layout, Type } from '@/constants/theme';
 import { useCategories } from '@/hooks/use-categories';
 import { useTheme } from '@/hooks/use-theme';
@@ -299,7 +299,7 @@ export default function AdminWorkerNewScreen() {
             <Text style={[Type.footnote, styles.label, { color: theme.textSecondary }]}>
               ISH JOYI
             </Text>
-            <YandexMap
+            <AppMap
               point={{ lat: Number(lat) || TASHKENT.lat, lng: Number(lng) || TASHKENT.lng }}
               height={220}
               caption="Xaritada o'zgartirish"
