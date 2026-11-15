@@ -97,7 +97,8 @@
         {
           "sounds": [
             "./assets/sounds/alarm.wav",
-            "./assets/sounds/order_ring.wav"
+            "./assets/sounds/order_ring.wav",
+            "./assets/sounds/notify_chime.wav"
           ],
           "color": "#534AB7",
           "defaultChannel": "orders",

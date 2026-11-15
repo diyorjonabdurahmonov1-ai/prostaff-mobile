@@ -502,11 +502,15 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
           // the app would replay every old message as a fresh banner.
           if (primedRef.current) {
             for (const n of fresh) {
-              presentLocalNotification({
-                title: n.title || 'PROSTAFF',
-                body: n.body,
-                data: { type: n.type, notification_id: n.id },
-              });
+              // Out of sight, the server's push has already told them; showing
+              // the same message again from here is the second ring.
+              if (AppState.currentState === 'active') {
+                presentLocalNotification({
+                  title: n.title || 'PROSTAFF',
+                  body: n.body,
+                  data: { type: n.type, notification_id: n.id },
+                });
+              }
               // A new order for a firm: with the app out of sight the pill turns
               // into an alert and the app comes to the front, as for a worker.
               if (
