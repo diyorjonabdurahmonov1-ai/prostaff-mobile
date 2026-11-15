@@ -3,9 +3,11 @@
  * work with the app out of sight — Android only.
  *
  *   1. Battery optimisation. Left on, Android puts the app to sleep in a
- *      pocket: location stops and notifications arrive late. The system has
- *      its own "let this app run in the background?" dialog, and this opens
- *      it directly.
+ *      pocket: location stops and notifications arrive late. This opens the
+ *      system's list of apps with their battery setting, where the worker picks
+ *      this one. (The one-tap dialog for a single app needs the
+ *      REQUEST_IGNORE_BATTERY_OPTIMIZATIONS permission, which Google Play
+ *      only grants to a few kinds of apps and rejects submissions over.)
  *   2. Autostart. Xiaomi, Huawei, Oppo, Vivo and a few others add a switch of
  *      their own, off by default, without which the app is killed the moment
  *      it leaves the screen. There is no way to read it and no standard way to
@@ -40,10 +42,9 @@ export async function openBatterySettings(): Promise<void> {
   if (Platform.OS !== 'android') return;
   const data = `package:${appPackage()}`;
   const attempts: [string, IntentLauncher.IntentLauncherParams | undefined][] = [
-    // The system's own yes/no dialog for this one app.
-    [IntentLauncher.ActivityAction.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, { data }],
-    // The list of apps, where it has to be found by hand.
+    // The list of apps with their battery setting; this one is found by name.
     [IntentLauncher.ActivityAction.IGNORE_BATTERY_OPTIMIZATION_SETTINGS, undefined],
+    // This app's own settings page, which has a battery entry on every phone.
     [IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS, { data }],
   ];
   for (const [action, params] of attempts) {

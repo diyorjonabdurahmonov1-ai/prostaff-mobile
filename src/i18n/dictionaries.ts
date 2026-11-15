@@ -259,7 +259,7 @@ export const uz = {
   'bgAccess.title': 'Fonda ishlashga ruxsat bering',
   'bgAccess.body': "Aks holda telefon ilovani uxlatib qo'yadi: ekran o'chiq turganda buyurtmalar kechikadi yoki kelmaydi.",
   'bgAccess.batteryTitle': "Batareya cheklovini o'chiring",
-  'bgAccess.batteryHint': 'Ochilgan oynada «Ruxsat berish»ni bosing.',
+  'bgAccess.batteryHint': "Ochilgan ro'yxatdan PROSTAFF ni topib, «Cheklovsiz» (yoki «Optimallashtirmaslik») ni tanlang.",
   'bgAccess.batteryAction': "Cheklovni o'chirish",
   'bgAccess.autostartTitle': 'Avtomatik ishga tushishni yoqing',
   'bgAccess.autostartHint': "Ochilgan ro'yxatda PROSTAFF yonidagi tugmani yoqing.",
@@ -731,6 +731,7 @@ export const uz = {
   'support.openFailed': "Ochib bo'lmadi. Telegram o'rnatilganini tekshiring yoki qo'ng'iroq qiling.",
 
   // legal
+  'legal.privacy': "Maxfiylik siyosati",
   'legal.offer': 'Ommaviy oferta',
   'legal.updated': 'Oxirgi yangilanish',
   'legal.version': 'tahrir',
@@ -988,7 +989,7 @@ export const ru: Dictionary = {
   'bgAccess.title': 'Разрешите работу в фоне',
   'bgAccess.body': 'Иначе телефон усыпит приложение: при выключенном экране заказы будут опаздывать или не придут.',
   'bgAccess.batteryTitle': 'Отключите ограничение батареи',
-  'bgAccess.batteryHint': 'В открывшемся окне нажмите «Разрешить».',
+  'bgAccess.batteryHint': 'В открывшемся списке найдите PROSTAFF и выберите «Без ограничений» (или «Не оптимизировать»).',
   'bgAccess.batteryAction': 'Отключить ограничение',
   'bgAccess.autostartTitle': 'Включите автозапуск',
   'bgAccess.autostartHint': 'В открывшемся списке включите переключатель рядом с PROSTAFF.',
@@ -1429,6 +1430,7 @@ export const ru: Dictionary = {
   'support.telegramLinkHint': 'Через другой клиент Telegram или браузер',
   'support.openFailed': 'Не удалось открыть. Проверьте, установлен ли Telegram, или позвоните нам.',
 
+  'legal.privacy': "Политика конфиденциальности",
   'legal.offer': 'Публичная оферта',
   'legal.updated': 'Последнее обновление',
   'legal.version': 'редакция',
@@ -1682,7 +1684,7 @@ export const en: Dictionary = {
   'bgAccess.title': 'Allow the app to work in the background',
   'bgAccess.body': 'Otherwise the phone puts the app to sleep: with the screen off, orders arrive late or not at all.',
   'bgAccess.batteryTitle': 'Turn off battery restriction',
-  'bgAccess.batteryHint': 'Tap “Allow” in the dialog that opens.',
+  'bgAccess.batteryHint': 'In the list that opens, find PROSTAFF and choose “Unrestricted” (or “Don’t optimise”).',
   'bgAccess.batteryAction': 'Turn off restriction',
   'bgAccess.autostartTitle': 'Turn on autostart',
   'bgAccess.autostartHint': 'In the list that opens, switch on PROSTAFF.',
@@ -2122,6 +2124,7 @@ export const en: Dictionary = {
   'support.telegramLinkHint': 'Through another Telegram client or the browser',
   'support.openFailed': 'Could not open it. Check that Telegram is installed, or call us instead.',
 
+  'legal.privacy': "Privacy policy",
   'legal.offer': 'Public offer',
   'legal.updated': 'Last updated',
   'legal.version': 'revision',

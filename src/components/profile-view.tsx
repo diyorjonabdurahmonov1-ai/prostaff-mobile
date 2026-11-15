@@ -14,7 +14,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { SupportSheet } from '@/components/support-sheet';
@@ -25,7 +25,7 @@ import { PressableScale } from '@/components/ui/pressable-scale';
 import { Gradients, Layout, Radius, Shadow, Squircle, Type } from '@/constants/theme';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { useI18n, useT } from '@/i18n';
-import { api } from '@/lib/api';
+import { api, API_BASE_URL } from '@/lib/api';
 import { formatSom } from '@/lib/format';
 import { switchRoot } from '@/lib/nav';
 import {
@@ -412,6 +412,15 @@ export function ProfileView({ children }: ProfileViewProps) {
           iconColor="#8E8E93"
           title={t('legal.offer')}
           onPress={() => router.push('/legal/offer')}
+          chevron
+        />
+        {/* A web page rather than a screen: the stores ask for a public address
+            for it, and this is that address. */}
+        <Row
+          icon="lock-closed"
+          iconColor="#8E8E93"
+          title={t('legal.privacy')}
+          onPress={() => Linking.openURL(`${API_BASE_URL}/privacy`).catch(() => {})}
           chevron
         />
       </Section>
