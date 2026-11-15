@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { CardPaymentHost } from '@/components/card-payment-host';
 import { useTheme } from '@/hooks/use-theme';
@@ -97,6 +97,7 @@ export default function AppLayout() {
           to put the card and SMS-code steps on screen, so no screen that buys
           something has to know they exist. */}
       <CardPaymentHost />
+      <DevicePing />
       {isWorker ? <WorkerLocationGuard /> : null}
       {isCompany ? <CompanyPresenceGuard /> : null}
       {isCompany ? <CompanyLiveGuard /> : null}
@@ -105,6 +106,33 @@ export default function AppLayout() {
           notification is what gets attention. */}
     </OrderFlowProvider>
   );
+}
+
+/**
+ * "This phone is in use": a call about once a minute while the app is open.
+ *
+ * One account is open on one phone at a time. The server decides whether a
+ * second phone may sign in by whether the first has been heard from lately, and
+ * every request counts — but a person reading a screen makes none, so this is
+ * the quiet heartbeat that keeps the account theirs. A phone that has been
+ * replaced learns it here too, and signs itself out.
+ */
+function DevicePing() {
+  useEffect(() => {
+    const ping = () => {
+      if (AppState.currentState === 'active') api.post('/me/ping').catch(() => {});
+    };
+    ping();
+    const timer = setInterval(ping, 60_000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') ping();
+    });
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
+  }, []);
+  return null;
 }
 
 /**

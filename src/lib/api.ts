@@ -13,6 +13,8 @@
 
 import { Platform } from 'react-native';
 
+import { getDeviceId } from '@/lib/device-id';
+
 const DEFAULT_PORT = 8080;
 
 /** Tunnel used when no explicit override is set (device testing without LAN). */
@@ -77,6 +79,15 @@ export function setOnRefreshFailed(cb: typeof onRefreshFailed) {
   onRefreshFailed = cb;
 }
 
+/**
+ * Called with the server's words when another phone has taken this account
+ * over. The auth store shows it, then signs this phone out.
+ */
+let onSessionReplaced: ((message: string) => void) | null = null;
+export function setOnSessionReplaced(cb: typeof onSessionReplaced) {
+  onSessionReplaced = cb;
+}
+
 // ---- Refresh logic ---------------------------------------------------------
 
 let refreshPromise: Promise<boolean> | null = null;
@@ -93,10 +104,25 @@ async function tryRefreshToken(): Promise<boolean> {
     try {
       const res = await fetch(`${API_URL}/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Device-Id': await getDeviceId(),
+        },
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        // Another phone took the account: say so rather than just signing out.
+        try {
+          const err = (await res.json()) as { error?: { code?: string; message?: string } };
+          if (err.error?.code === 'session_replaced') {
+            onSessionReplaced?.(err.error.message ?? '');
+          }
+        } catch {
+          // not JSON — a plain refusal
+        }
+        return false;
+      }
       const data = (await res.json()) as {
         token: string;
         refresh_token: string;
@@ -161,7 +187,7 @@ async function request<T>(
   body?: unknown,
   options: RequestOptions = {}
 ): Promise<T> {
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = { Accept: 'application/json', 'X-Device-Id': await getDeviceId() };
   const token = options.token !== undefined ? options.token : authToken;
   if (token) headers.Authorization = `Bearer ${token}`;
 

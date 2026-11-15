@@ -14,6 +14,7 @@
  */
 
 import * as SecureStore from 'expo-secure-store';
+import { Alert } from 'react-native';
 
 import { resetPushToken } from '@/lib/notifications';
 import { socket } from '@/lib/socket';
@@ -33,6 +34,7 @@ import {
   setRefreshToken as setApiRefreshToken,
   setAuthToken,
   setOnRefreshFailed,
+  setOnSessionReplaced,
   setOnTokenRefreshed,
 } from '@/lib/api';
 import type {
@@ -238,9 +240,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       doSignOut();
     });
 
+    // Another phone took this account over: say so, the sign-out follows.
+    setOnSessionReplaced((message) => {
+      Alert.alert(message || 'Bu akkaunt boshqa telefonda ochildi. Qayta kiring.');
+    });
+
     return () => {
       setOnTokenRefreshed(null);
       setOnRefreshFailed(null);
+      setOnSessionReplaced(null);
     };
   }, [doSignOut]);
 
