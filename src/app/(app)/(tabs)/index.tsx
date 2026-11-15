@@ -42,6 +42,8 @@ import { NotificationBell } from '@/components/notification-bell';
 import { OnlineCompaniesCarousel } from '@/components/online-companies-carousel';
 import { AppMap } from '@/components/app-map';
 import { useCategories } from '@/hooks/use-categories';
+import { Segmented } from '@/components/ui/segmented';
+import { useOrderFlow } from '@/store/order-flow';
 import { useRefresh } from '@/hooks/use-refresh';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { useI18n, useT } from '@/i18n';
@@ -51,7 +53,7 @@ import { distanceKm, getCoordsWithFallback } from '@/lib/location';
 import { hasCoords } from '@/lib/maps';
 import { switchRoot } from '@/lib/nav';
 import type { LatLng } from '@/lib/maps';
-import type { CompanyProfile, WorkerProfile } from '@/lib/types';
+import type { CompanyProfile, Gender, WorkerProfile } from '@/lib/types';
 import { useAuth } from '@/store/auth';
 
 import { Icon } from '@/components/ui/icon';
@@ -705,7 +707,19 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
   const { lang } = useI18n();
   const theme = useTheme();
   const router = useRouter();
-  const { categories } = useCategories();
+  const { categories, activeCategories } = useCategories();
+  const { reset } = useOrderFlow();
+  /**
+   * What kind of help is needed, asked first.
+   *
+   * The list used to show every worker nearby whatever they do, and the service
+   * was asked about only afterwards — so somebody who only does garden work
+   * showed up for a customer who needed a removal. Now the customer says the
+   * service (and, if it matters, the gender) first, and only workers who offer
+   * it are shown.
+   */
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [gender, setGender] = useState<Gender>('any');
   const [workers, setWorkers] = useState<WorkerProfile[]>([]);
   const [center, setCenter] = useState<LatLng | null>(null);
   /** The point every search on this screen is measured from — see `load`. */
@@ -733,6 +747,11 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
 
   const load = useCallback(async () => {
     try {
+      if (!categoryId) {
+        setWorkers([]);
+        return;
+      }
+      const wanted: string = categoryId;
       /**
        * The point is resolved once per visit, not once per search.
        *
@@ -752,8 +771,10 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
         setCenter(point);
         setGuessed(!coords.resolved);
       }
+      const filters =
+        `&category_id=${encodeURIComponent(wanted)}` + (gender !== 'any' ? `&gender=${gender}` : '');
       const data = await api.get<WorkerProfile[]>(
-        `/workers/nearby?lat=${point.lat}&lng=${point.lng}&radius_km=${radiusKm}`,
+        `/workers/nearby?lat=${point.lat}&lng=${point.lng}&radius_km=${radiusKm}${filters}`,
       );
       if (mine !== requestRef.current) return;
       // Nearest first, and nobody from outside the radius on the slider.
@@ -765,7 +786,7 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, [radiusKm]);
+  }, [radiusKm, categoryId, gender]);
 
   useEffect(() => {
     load();
@@ -821,14 +842,46 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
      * `|` rather than a comma: it cannot occur in an id, and a worker's name is
      * far likelier to contain a comma than a pipe.
      */
-    router.push({
-      pathname: '/categories',
-      params: {
-        worker: picked.map((w) => w.id).join('|'),
-        workerName: picked.map((w) => w.full_name).join('|'),
-      },
+    // The service is already known, so the order goes straight to its details.
+    reset({
+      categoryId,
+      targetWorkerIds: picked.map((w) => w.id),
+      targetWorkerNames: picked.map((w) => w.full_name),
+      gender,
     });
+    router.push('/details');
   };
+
+  // Step one: what kind of help.
+  if (!categoryId) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+        <Header title={t('customer.workers')} large back onBack={onBack} subtitle={t('pick.whatKind')} />
+        <ScrollView contentContainerStyle={styles.listScroll} showsVerticalScrollIndicator={false}>
+          <View style={styles.catGrid}>
+            {activeCategories.map((c) => (
+              <Pressable
+                key={c.id}
+                onPress={() => setCategoryId(c.id)}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.catPill,
+                  Squircle,
+                  { backgroundColor: theme.surface },
+                  pressed && styles.pressed,
+                ]}>
+                <Text style={[Type.subheadEmphasized, { color: theme.text }]} numberOfLines={2}>
+                  {categoryName(c, lang)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  const chosenCategory = categories.find((c) => c.id === categoryId);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
@@ -846,6 +899,38 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
         contentContainerStyle={styles.listScrollPicking}
         showsVerticalScrollIndicator={false}
         refreshControl={refreshControl}>
+        {/* What they asked for, and who they want it from. */}
+        <View style={styles.filters}>
+          <Pressable
+            onPress={() => {
+              setCategoryId(null);
+              setChosen([]);
+            }}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.catChosen,
+              Squircle,
+              { backgroundColor: theme.primarySoft },
+              pressed && styles.pressed,
+            ]}>
+            <Text style={[Type.subheadEmphasized, { color: theme.primary, flex: 1 }]} numberOfLines={1}>
+              {chosenCategory ? categoryName(chosenCategory, lang) : ''}
+            </Text>
+            <Text style={[Type.footnote, { color: theme.primary }]}>{t('pick.change')}</Text>
+          </Pressable>
+          <Segmented<Gender>
+            value={gender}
+            onChange={(g) => {
+              setGender(g);
+              setChosen([]);
+            }}
+            options={[
+              { value: 'any', label: t('order.any') },
+              { value: 'male', label: t('order.male') },
+              { value: 'female', label: t('order.female') },
+            ]}
+          />
+        </View>
         <RadiusSection
           radiusKm={radiusKm}
           onCommit={setRadiusKm}
@@ -978,6 +1063,24 @@ const styles = StyleSheet.create({
 
   sectionCaption: { paddingHorizontal: Layout.gutter + 4, paddingBottom: 8 },
 
+
+  catGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    paddingHorizontal: Layout.gutter,
+    paddingTop: 8,
+  },
+  catPill: { paddingHorizontal: 16, paddingVertical: 14, borderRadius: Radius.lg, minWidth: '47%', flexGrow: 1 },
+  filters: { paddingHorizontal: Layout.gutter, gap: 10, marginTop: 8 },
+  catChosen: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: Radius.lg,
+  },
 
   radiusSection: { marginTop: 12 },
   guessed: {
