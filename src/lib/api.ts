@@ -122,8 +122,18 @@ async function tryRefreshToken(): Promise<boolean> {
 
 type Query = Record<string, string | number | boolean | undefined | null>;
 
+/**
+ * How long a request may take before it is given up on. A request that is never
+ * answered (a phone that thinks it has signal, a server mid-restart) used to
+ * hang for ever — and anything waiting on it, like the online switch, hung with
+ * it. Callers that really need longer can pass `timeoutMs`.
+ */
+const REQUEST_TIMEOUT_MS = 20_000;
+
 interface RequestOptions {
   query?: Query;
+  /** Give up after this long. Defaults to 20 s; ignored when `signal` is given. */
+  timeoutMs?: number;
   /** override / supply a token for this single call (used before it is stored) */
   token?: string | null;
   signal?: AbortSignal;
@@ -161,15 +171,25 @@ async function request<T>(
     payload = JSON.stringify(body);
   }
 
+  const timeout = options.signal ? null : new AbortController();
+  const timer = timeout ? setTimeout(() => timeout.abort(), options.timeoutMs ?? REQUEST_TIMEOUT_MS) : null;
+  const done = () => {
+    if (timer) clearTimeout(timer);
+  };
+
   let res: Response;
   try {
     res = await fetch(buildUrl(path, options.query), {
       method,
       headers,
       body: payload,
-      signal: options.signal,
+      signal: options.signal ?? timeout?.signal,
     });
   } catch (err) {
+    done();
+    if (timeout?.signal.aborted) {
+      throw new ApiError('timeout', 'Server javob bermadi. Qaytadan urinib ko‘ring.', 0);
+    }
     throw new ApiError(
       'network_error',
       err instanceof Error ? err.message : 'Network request failed',
@@ -179,6 +199,7 @@ async function request<T>(
 
   // --- Auto-refresh on 401 ---
   if (res.status === 401 && !options._skipRefresh && authToken) {
+    done();
     if (refreshToken) {
       const refreshed = await tryRefreshToken();
       if (refreshed) {
@@ -197,10 +218,25 @@ async function request<T>(
   }
 
   if (res.status === 204) {
+    done();
     return undefined as T;
   }
 
-  const text = await res.text();
+  let text: string;
+  try {
+    text = await res.text();
+  } catch (err) {
+    if (timeout?.signal.aborted) {
+      throw new ApiError('timeout', 'Server javob bermadi. Qaytadan urinib ko‘ring.', 0);
+    }
+    throw new ApiError(
+      'network_error',
+      err instanceof Error ? err.message : 'Network request failed',
+      0
+    );
+  } finally {
+    done();
+  }
   let data: unknown = undefined;
   if (text.length > 0) {
     try {

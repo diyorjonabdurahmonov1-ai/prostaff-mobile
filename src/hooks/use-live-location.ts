@@ -37,6 +37,10 @@ const CHECK_MS = 10_000;
 /** Reports closer together than this add load without telling dispatch anything. */
 const REPORT_MIN_MS = 60_000;
 const REPORT_MIN_METRES = 150;
+/** How long a fresh GPS read may take before the last known position is used. */
+const FIX_TIMEOUT_MS = 8_000;
+/** How old that last known position may be and still count as "here". */
+const FIX_MAX_AGE_MS = 2 * 60_000;
 
 async function readStatus(): Promise<LocationStatus> {
   try {
@@ -55,8 +59,15 @@ async function readStatus(): Promise<LocationStatus> {
 export async function getPreciseFix(): Promise<Fix | null> {
   if ((await readStatus()) !== 'ok') return null;
   try {
-    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    return { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    // getCurrentPositionAsync can wait for ever indoors, with a weak GPS — and
+    // whatever was waiting on it (the online switch) waited with it. So it gets
+    // a few seconds, then the last position the phone knew of if that is recent.
+    const fresh = await Promise.race([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), FIX_TIMEOUT_MS)),
+    ]);
+    const pos = fresh ?? (await Location.getLastKnownPositionAsync({ maxAge: FIX_MAX_AGE_MS }));
+    return pos ? { lat: pos.coords.latitude, lng: pos.coords.longitude } : null;
   } catch {
     return null;
   }
