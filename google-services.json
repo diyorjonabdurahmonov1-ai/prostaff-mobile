@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "1070718667324",
-    "project_id": "prostaff-cec9e",
-    "storage_bucket": "prostaff-cec9e.firebasestorage.app"
+    "project_number": "407531443219",
+    "project_id": "prostaff-cf797",
+    "storage_bucket": "prostaff-cf797.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1070718667324:android:40752fc3784bb996e25139",
+        "mobilesdk_app_id": "1:407531443219:android:55ce306cf027c5da849be6",
         "android_client_info": {
           "package_name": "com.prostaff.app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyClzlwYDnv4gj8L5ZRwHSSI5J-2-pK3SfE"
+          "current_key": "AIzaSyBhLWPJl5f4lh5-SU_UL1F1DpckNg2jW-Y"
         }
       ],
       "services": {
