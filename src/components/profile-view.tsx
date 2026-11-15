@@ -112,15 +112,12 @@ export function ProfileView({ children }: ProfileViewProps) {
 
   /**
    * Worker and company accounts are opened by the office, not from the app.
-   * Someone who wants to work is given the number to call; the admin fills the
-   * details in and the panel simply appears on this screen afterwards.
+   * Whoever wants to work taps the row and lands in the office's Telegram chat,
+   * where the documents are collected and the account is opened; the panel
+   * appears on this screen afterwards. One tap, nothing to read first.
    */
-  const requestProvider = (title: string) => {
-    Alert.alert(title, t('provider.adminOnly', { phone: SUPPORT_PHONE, telegram: SUPPORT_TELEGRAM_HANDLE }), [
-      { text: t('common.close'), style: 'cancel' },
-      { text: t('support.telegram'), onPress: () => void openTelegramApp() },
-      { text: t('common.call'), onPress: () => void callSupport().catch(() => {}) },
-    ]);
+  const contactOffice = async () => {
+    if (!(await openTelegramApp())) Alert.alert(t('support.title'), t('support.openFailed'));
   };
 
   /**
@@ -130,14 +127,14 @@ export function ProfileView({ children }: ProfileViewProps) {
    */
   const goWorker = async () => {
     const fresh = (await refreshMe()) ?? user;
-    if (!fresh?.worker_profile) return requestProvider(t('profile.mode.worker'));
+    if (!fresh?.worker_profile) return contactOffice();
     setActiveMode('worker');
     switchRoot('/worker');
   };
 
   const goCompany = async () => {
     const fresh = (await refreshMe()) ?? user;
-    if (!fresh?.company_profile) return requestProvider(t('profile.mode.company'));
+    if (!fresh?.company_profile) return contactOffice();
     setActiveMode('company');
     switchRoot('/company');
   };
@@ -289,13 +286,7 @@ export function ProfileView({ children }: ProfileViewProps) {
         header={t('profile.activeMode')}
         separatorInset={ICON_INSET}
         style={styles.section}
-        footer={
-          isProvider
-            ? t('profile.customerHint')
-            : user?.worker_profile && user?.company_profile
-              ? undefined
-              : t('provider.adminOnlyHint')
-        }>
+        footer={isProvider ? t('profile.customerHint') : undefined}>
         <Row
           icon="person"
           iconColor="#8E8E93"
@@ -312,14 +303,8 @@ export function ProfileView({ children }: ProfileViewProps) {
         <Row
           icon="hammer"
           iconColor="#5E7CFA"
-          title={t('profile.mode.worker')}
-          value={
-            !user?.worker_profile
-              ? t('provider.request')
-              : activeMode === 'worker'
-                ? t('profile.modeActive')
-                : undefined
-          }
+          title={user?.worker_profile ? t('profile.mode.worker') : t('profile.becomeWorker')}
+          value={user?.worker_profile && activeMode === 'worker' ? t('profile.modeActive') : undefined}
           onPress={goWorker}
           right={
             user?.worker_profile ? (
@@ -328,21 +313,17 @@ export function ProfileView({ children }: ProfileViewProps) {
                 size={19}
                 color={activeMode === 'worker' ? theme.success : theme.textTertiary}
               />
-            ) : null
+            ) : (
+              <Icon name="paper-plane" size={19} color="#229ED9" />
+            )
           }
           chevron
         />
         <Row
           icon="business"
           iconColor="#20B8A6"
-          title={t('profile.mode.company')}
-          value={
-            !user?.company_profile
-              ? t('provider.request')
-              : activeMode === 'company'
-                ? t('profile.modeActive')
-                : undefined
-          }
+          title={user?.company_profile ? t('profile.mode.company') : t('profile.becomeCompany')}
+          value={user?.company_profile && activeMode === 'company' ? t('profile.modeActive') : undefined}
           onPress={goCompany}
           right={
             user?.company_profile ? (
@@ -351,7 +332,9 @@ export function ProfileView({ children }: ProfileViewProps) {
                 size={19}
                 color={activeMode === 'company' ? theme.success : theme.textTertiary}
               />
-            ) : null
+            ) : (
+              <Icon name="paper-plane" size={19} color="#229ED9" />
+            )
           }
           chevron
         />

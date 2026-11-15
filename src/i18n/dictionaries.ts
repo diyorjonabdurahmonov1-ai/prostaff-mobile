@@ -493,12 +493,6 @@ export const uz = {
   'map.pickTitle': 'Manzilni belgilang',
   'map.edit': "Xaritada o'zgartirish",
 
-  // becoming a worker / company — admin only
-  'provider.request': 'Adminka orqali',
-  'provider.adminOnly':
-    "Ishchi yoki firma sifatida ishlash uchun biz bilan bog'laning: {phone} yoki Telegram {telegram}. Ma'lumotlaringizni admin to'ldirib beradi, keyin shu raqam bilan kirasiz.",
-  'provider.adminOnlyHint':
-    "Ishchi va firma hisoblari faqat adminka orqali ochiladi. Telefon yoki Telegram orqali bog'laning.",
 
   // language names
   'lang.uz': "O'zbekcha",
@@ -1212,11 +1206,6 @@ export const ru: Dictionary = {
   'map.pickTitle': 'Укажите адрес',
   'map.edit': 'Изменить на карте',
 
-  'provider.request': 'Через админку',
-  'provider.adminOnly':
-    'Чтобы работать как работник или компания, свяжитесь с нами: {phone} или в Telegram {telegram}. Админ заполнит ваши данные, после этого вы войдёте с этим же номером.',
-  'provider.adminOnlyHint':
-    'Аккаунты работников и компаний открывает только админ. Свяжитесь по телефону или в Telegram.',
 
   'lang.uz': "O'zbekcha",
   'lang.ru': 'Русский',
@@ -1906,11 +1895,6 @@ export const en: Dictionary = {
   'map.pickTitle': 'Set the address',
   'map.edit': 'Change on map',
 
-  'provider.request': 'Via the admin office',
-  'provider.adminOnly':
-    'To work as a worker or a company, reach us on {phone} or on Telegram at {telegram}. An admin fills in your details, then you sign in with the same number.',
-  'provider.adminOnlyHint':
-    'Worker and company accounts are opened by an admin only. Get in touch by phone or on Telegram.',
 
   'lang.uz': "O'zbekcha",
   'lang.ru': 'Русский',
