@@ -221,11 +221,11 @@ function WorkerLocationGuard() {
  * A firm's presence: online only with the permissions that let an order be
  * seen, and the pill over other apps while it waits.
  *
- * Entering company mode puts the firm online — but only once notifications and
- * "display over other apps" are allowed, and a permission taken away while
- * online takes it offline again, the same rule the worker has. Workers are
- * deliberately not put online for them: going online is their own decision,
- * and switching them on behind their back undid the toggle.
+ * Going online is the firm's own decision, from the switch on its panel — the
+ * same as a worker's. It used to be switched on for them on entering company
+ * mode, so a firm the office had just opened was live before anyone touched
+ * anything. A permission taken away, or location switched off, while online
+ * takes it offline again, the same rule the worker has.
  *
  * A firm that does not share its location has no service holding the app in the
  * background, so one is run for it while it is online (see lib/overlay).
@@ -237,19 +237,29 @@ function CompanyPresenceGuard() {
   const online = !!firm?.online;
   const requirements = useWorkRequirements();
 
-  // Once per entry into company mode, and only when it is allowed.
-  const autoOnlineRef = useRef(false);
+  // No location, no orders: a firm that cannot be placed is not offered work.
+  const { status: locationStatus } = useLiveLocation({ tracking: false });
+  const locationLost = locationStatus !== 'ok' && locationStatus !== 'checking';
+  const locationLapseRef = useRef(false);
   useEffect(() => {
-    if (autoOnlineRef.current || !firm || !requirements.checked || !requirements.ok) return;
-    autoOnlineRef.current = true;
-    if (firm.online) return;
+    if (!locationLost) {
+      locationLapseRef.current = false;
+      return;
+    }
+    if (!online || locationLapseRef.current) return;
+    locationLapseRef.current = true;
     api
-      .post('/company/status', { online: true })
+      .post('/company/status', { online: false })
       .then(() => refreshMe())
       .catch(() => {
-        // best-effort
+        // The next foreground retries it.
       });
-  }, [firm, requirements.checked, requirements.ok, refreshMe]);
+    presentLocalNotification({
+      title: t('loc.lostTitle'),
+      body: t('loc.lostBody'),
+      data: { type: 'location.lost' },
+    });
+  }, [locationLost, online, refreshMe, t]);
 
   const lapsed = Platform.OS === 'android' && requirements.checked && !requirements.ok;
   const lapseRef = useRef(false);

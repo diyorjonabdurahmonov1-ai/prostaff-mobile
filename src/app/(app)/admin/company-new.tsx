@@ -63,7 +63,9 @@ export default function AdminCompanyNewScreen() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [locating, setLocating] = useState(false);
   const [credit, setCredit] = useState(true);
-  const [online, setOnline] = useState(true);
+  // Off by default, like a worker: a new firm goes online itself, from its own
+  // panel, when it is ready to take orders.
+  const [online, setOnline] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /**

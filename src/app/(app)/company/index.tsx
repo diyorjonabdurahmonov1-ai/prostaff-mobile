@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -15,6 +15,7 @@ import { ActiveJobCard } from '@/components/active-job-card';
 import { AlertBannerList } from '@/components/alert-banner';
 import { BackgroundAccessCard } from '@/components/background-access-card';
 import { LiveLocationCard } from '@/components/live-location-card';
+import { LOCATION_COPY, LocationBanner } from '@/components/location-banner';
 import { OnlineToggle } from '@/components/online-toggle';
 import { WorkRequirementsCard } from '@/components/work-requirements-card';
 import { useWorkRequirements } from '@/hooks/use-work-requirements';
@@ -25,6 +26,7 @@ import { EmptyState, LoadingState } from '@/components/ui/empty-state';
 import { Header } from '@/components/ui/header';
 import { Row, Section } from '@/components/ui/list';
 import { Layout, Radius, Squircle, Type } from '@/constants/theme';
+import { useLiveLocation } from '@/hooks/use-live-location';
 import { useRefresh } from '@/hooks/use-refresh';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
@@ -49,6 +51,12 @@ export default function CompanyPanelScreen() {
   const profile = user?.company_profile ?? null;
 
   const [toggling, setToggling] = useState(false);
+  // What the switch shows while the request is on its way, so it moves at the
+  // tap and cannot be left half-flipped by a slow answer.
+  const [pendingOnline, setPendingOnline] = useState<boolean | null>(null);
+  // A tap lands before React has re-rendered with `toggling`; a ref is what
+  // actually stops a second tap starting a second request.
+  const busyRef = useRef(false);
   const [respondingId, setRespondingId] = useState<string | null>(null);
 
   // One feed for the panel and the orders screen, so answering a job on either
@@ -113,19 +121,36 @@ export default function CompanyPanelScreen() {
   const requirements = useWorkRequirements();
   const requirementsMissing = requirements.checked && !requirements.ok;
 
+  /**
+   * Whether the app can see the firm. A firm is found by where it is, so — like
+   * a worker — without location it is offline in every way that matters.
+   */
+  const location = useLiveLocation({ tracking: false });
+  const locationBlocked = location.status !== 'ok' && location.status !== 'checking';
+
   const setOnline = async (online: boolean) => {
+    if (busyRef.current) return;
     if (online && requirementsMissing) {
       Alert.alert(t('req.needTitle'), t('req.needBody'));
       return;
     }
+    // No location, no online: the tap asks for it, and carries on if granted.
+    if (online && locationBlocked && (await location.fix()) !== 'ok') return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setToggling(true);
+    setPendingOnline(online);
     try {
       await api.post<CompanyProfile>('/company/status', { online });
       await refreshMe();
     } catch (err) {
       Alert.alert(t('common.error'), err instanceof Error && err.message ? err.message : t('common.networkError'));
     } finally {
+      // Whatever happened, the switch is released: a stuck lock is the switch
+      // that "freezes".
+      setPendingOnline(null);
       setToggling(false);
+      busyRef.current = false;
     }
   };
 
@@ -139,7 +164,7 @@ export default function CompanyPanelScreen() {
     );
   }
 
-  const online = profile.online && !requirementsMissing;
+  const online = (pendingOnline ?? profile.online) && !locationBlocked && !requirementsMissing;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
@@ -168,16 +193,20 @@ export default function CompanyPanelScreen() {
         {/* Availability — the same big switch the worker has: whether orders
             reach the firm is the most consequential setting on this screen. */}
         <View style={styles.toggle}>
+          {locationBlocked ? <LocationBanner status={location.status} onFix={location.fix} /> : null}
           {requirementsMissing ? <WorkRequirementsCard requirements={requirements} /> : null}
           <OnlineToggle
             online={online}
             disabled={toggling}
             onChange={setOnline}
             onLabel={`${t('common.online')} · ${t('company.takingOrders')}`}
-            offLabel={t('common.offline')}
+            offLabel={locationBlocked ? t(LOCATION_COPY[location.status].toggle) : t('common.offline')}
+            offIcon={locationBlocked ? 'location' : undefined}
           />
           <Text style={[Type.footnote, styles.toggleHint, { color: theme.textSecondary }]}>
-            {requirementsMissing
+            {locationBlocked
+              ? t('loc.toggleHint')
+              : requirementsMissing
               ? t('req.offHint')
               : online
                 ? t('company.onlineHint')
