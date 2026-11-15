@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -130,8 +130,12 @@ export default function WorkerPanelScreen() {
   const requirements = useWorkRequirements();
   const requirementsMissing = requirements.checked && !requirements.ok;
 
+  // A tap lands before React has re-rendered with `busy`; the ref is what really
+  // stops a second tap starting a second request.
+  const busyRef = useRef(false);
+
   const setOnline = async (next: boolean) => {
-    if (busy) return;
+    if (busyRef.current) return;
     if (next && requirementsMissing) {
       Alert.alert(t('req.needTitle'), t('req.needBody'));
       return;
@@ -139,6 +143,8 @@ export default function WorkerPanelScreen() {
     // No location, no online: the tap asks for it — and carries on if the
     // worker grants it, so one tap is enough.
     if (next && locationBlocked && (await location.fix()) !== 'ok') return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setPendingOnline(next);
     // Recorded before the request, so a location report already on its way
@@ -167,6 +173,7 @@ export default function WorkerPanelScreen() {
     } finally {
       setPendingOnline(null);
       setBusy(false);
+      busyRef.current = false;
     }
   };
 
