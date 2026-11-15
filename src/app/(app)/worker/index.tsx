@@ -134,8 +134,20 @@ export default function WorkerPanelScreen() {
   // stops a second tap starting a second request.
   const busyRef = useRef(false);
 
+  /**
+   * A worker with no service chosen is sent nothing — an order names a service,
+   * and only workers who offer it are rung — so the switch stays off until they
+   * pick at least one.
+   */
+  const noCategories = (profile?.category_ids?.length ?? 0) === 0;
+
   const setOnline = async (next: boolean) => {
     if (busyRef.current) return;
+    if (next && noCategories) {
+      Alert.alert(t('cat.requiredTitle'), t('cat.requiredBody'));
+      router.push('/worker/edit');
+      return;
+    }
     if (next && requirementsMissing) {
       Alert.alert(t('req.needTitle'), t('req.needBody'));
       return;
@@ -191,7 +203,7 @@ export default function WorkerPanelScreen() {
   // Without a location the worker is offline in every way that matters to them
   // (no orders reach them), whatever the server last heard — so the whole
   // screen says so, not just the switch.
-  const online = (pendingOnline ?? profile.online) && !locationBlocked && !requirementsMissing;
+  const online = (pendingOnline ?? profile.online) && !locationBlocked && !requirementsMissing && !noCategories;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
@@ -260,6 +272,21 @@ export default function WorkerPanelScreen() {
 
         {/* ---- Availability ---- */}
         <FadeUp index={1} step={Stagger.card} style={styles.block}>
+          {noCategories ? (
+            <Pressable
+              onPress={() => router.push('/worker/edit')}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.catNeed,
+                Squircle,
+                { backgroundColor: theme.warningSoft },
+                pressed && styles.pressed,
+              ]}>
+              <Text style={[Type.subheadEmphasized, { color: theme.text }]}>{t('cat.requiredTitle')}</Text>
+              <Text style={[Type.footnote, { color: theme.textSecondary }]}>{t('cat.requiredBody')}</Text>
+              <Text style={[Type.subheadEmphasized, { color: theme.primary }]}>{t('cat.requiredAction')} →</Text>
+            </Pressable>
+          ) : null}
           {locationBlocked ? (
             <LocationBanner status={location.status} onFix={location.fix} />
           ) : null}
@@ -270,7 +297,13 @@ export default function WorkerPanelScreen() {
             disabled={busy}
             onChange={setOnline}
             onLabel={`${t('common.online')} · ${t('worker.searchingJobs')}`}
-            offLabel={locationBlocked ? t(LOCATION_COPY[location.status].toggle) : t('common.offline')}
+            offLabel={
+              noCategories
+                ? t('cat.requiredToggle')
+                : locationBlocked
+                  ? t(LOCATION_COPY[location.status].toggle)
+                  : t('common.offline')
+            }
             offIcon={locationBlocked ? 'location' : undefined}
             onJob={!!activeOrder}
             onJobLabel={`${t('worker.onJob')} · ${t('worker.onJobDoing')}`}
@@ -498,6 +531,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   hint: { marginTop: 10, paddingHorizontal: 4 },
+  catNeed: { borderRadius: Radius.lg, padding: 14, gap: 4, marginBottom: 14 },
 
   incoming: { marginTop: 24, gap: 12 },
   incomingHead: {
