@@ -13,7 +13,7 @@
  */
 
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { PulseRing } from '@/components/motion';
@@ -92,25 +92,50 @@ export function ActiveJobCard({
    */
   const gathering = (order.batch_size ?? 0) > 1 && order.batch_ready === false;
 
-  const onTheWay = !!order.departed_at && !order.arrived_at;
+  /**
+   * What the worker just did, shown at once. The order only learns of it on the
+   * next refresh, and a button that sits there looking unpressed for seconds
+   * reads as frozen — so the card moves on the tap and the server catches up.
+   */
+  const [done, setDone] = useState<{ id: string; departed?: boolean; arrived?: boolean }>({ id: '' });
+  const local = done.id === order.id ? done : { id: order.id };
+  const departedAt = order.departed_at || local.departed;
+  const arrivedAt = order.arrived_at || local.arrived;
+  // A tap lands before React re-renders with `busy`; the ref is what stops a
+  // second tap starting a second request.
+  const actingRef = useRef(false);
+
+  const onTheWay = !!departedAt && !arrivedAt;
 
   // Reporting survives the app being restarted mid-trip: if the order says the
   // worker is on the way, make sure the phone is still telling the customer.
   useEffect(() => {
     if (onTheWay) {
       startTripTracking(order.id, { title: t('trip.noticeTitle'), body: t('trip.noticeBody') });
-    } else if (order.arrived_at) {
+    } else if (arrivedAt) {
       stopTripTracking();
     }
-  }, [onTheWay, order.id, order.arrived_at, t]);
+  }, [onTheWay, order.id, arrivedAt, t]);
 
-  /** "I'm on my way" — starts the customer's live map. */
+  /**
+   * "I'm on my way" — starts the customer's live map.
+   *
+   * Nothing here waits for the GPS. It used to read a fix first, and a phone
+   * indoors could take for ever, with the button dead the whole time. The
+   * server only needs to hear the worker has set off; the position follows from
+   * the trip reporter, and one is sent straight away in the background.
+   */
   const depart = async () => {
+    if (actingRef.current) return;
+    actingRef.current = true;
     setBusy(true);
     try {
-      const fix = await getPreciseFix();
-      await api.post(`/worker/orders/${order.id}/depart`, fix ? { lat: fix.lat, lng: fix.lng } : {});
-      await onEnded();
+      await api.post(`/worker/orders/${order.id}/depart`, {});
+      setDone({ id: order.id, departed: true });
+      getPreciseFix()
+        .then((fix) => fix && api.post(`/worker/orders/${order.id}/position`, { lat: fix.lat, lng: fix.lng }))
+        .catch(() => {});
+      Promise.resolve(onEnded()).catch(() => {});
     } catch (err) {
       Alert.alert(
         t('common.error'),
@@ -118,16 +143,20 @@ export function ActiveJobCard({
       );
     } finally {
       setBusy(false);
+      actingRef.current = false;
     }
   };
 
   /** "I am at the customer's" — after this they cannot report a no-show. */
   const arrive = async () => {
+    if (actingRef.current) return;
+    actingRef.current = true;
     setBusy(true);
     try {
       await api.post(`/worker/orders/${order.id}/arrived`);
-      await stopTripTracking();
-      await onEnded();
+      setDone({ id: order.id, departed: true, arrived: true });
+      stopTripTracking().catch(() => {});
+      Promise.resolve(onEnded()).catch(() => {});
     } catch (err) {
       Alert.alert(
         t('common.error'),
@@ -135,6 +164,7 @@ export function ActiveJobCard({
       );
     } finally {
       setBusy(false);
+      actingRef.current = false;
     }
   };
 
@@ -277,14 +307,14 @@ export function ActiveJobCard({
 
         {/* ---- Arrival ---- Said once; from then on the customer can no longer
             report that nobody came. */}
-        {gathering ? null : order.arrived_at ? (
+        {gathering ? null : arrivedAt ? (
           <View style={[styles.arrived, Squircle, { backgroundColor: theme.successSoft }]}>
             <Icon name="checkmark-circle" size={18} color={theme.success} />
             <Text style={[Type.footnoteEmphasized, styles.flex, { color: theme.success }]}>
               {t('job.arrivedDone')}
             </Text>
           </View>
-        ) : order.departed_at ? (
+        ) : departedAt ? (
           <View style={{ gap: 10 }}>
             <View style={[styles.arrived, Squircle, { backgroundColor: theme.primarySoft }]}>
               <Icon name="location" size={18} color={theme.primary} />
