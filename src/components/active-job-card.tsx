@@ -31,6 +31,8 @@ import { api } from '@/lib/api';
 import { categoryIcon } from '@/lib/category-icon';
 import { categoryName, formatSom, telUrl } from '@/lib/format';
 import { hasCoords, openInMaps } from '@/lib/maps';
+import { getPreciseFix } from '@/hooks/use-live-location';
+import { startTripTracking, stopTripTracking } from '@/lib/trip-tracking';
 import type { Order, OrderCustomer } from '@/lib/types';
 
 type Ending = 'complete' | 'cancel';
@@ -90,11 +92,41 @@ export function ActiveJobCard({
    */
   const gathering = (order.batch_size ?? 0) > 1 && order.batch_ready === false;
 
+  const onTheWay = !!order.departed_at && !order.arrived_at;
+
+  // Reporting survives the app being restarted mid-trip: if the order says the
+  // worker is on the way, make sure the phone is still telling the customer.
+  useEffect(() => {
+    if (onTheWay) {
+      startTripTracking(order.id, { title: t('trip.noticeTitle'), body: t('trip.noticeBody') });
+    } else if (order.arrived_at) {
+      stopTripTracking();
+    }
+  }, [onTheWay, order.id, order.arrived_at, t]);
+
+  /** "I'm on my way" — starts the customer's live map. */
+  const depart = async () => {
+    setBusy(true);
+    try {
+      const fix = await getPreciseFix();
+      await api.post(`/worker/orders/${order.id}/depart`, fix ? { lat: fix.lat, lng: fix.lng } : {});
+      await onEnded();
+    } catch (err) {
+      Alert.alert(
+        t('common.error'),
+        err instanceof Error && err.message ? err.message : t('common.genericError'),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   /** "I am at the customer's" — after this they cannot report a no-show. */
   const arrive = async () => {
     setBusy(true);
     try {
       await api.post(`/worker/orders/${order.id}/arrived`);
+      await stopTripTracking();
       await onEnded();
     } catch (err) {
       Alert.alert(
@@ -252,8 +284,21 @@ export function ActiveJobCard({
               {t('job.arrivedDone')}
             </Text>
           </View>
+        ) : order.departed_at ? (
+          <View style={{ gap: 10 }}>
+            <View style={[styles.arrived, Squircle, { backgroundColor: theme.primarySoft }]}>
+              <Icon name="location" size={18} color={theme.primary} />
+              <Text style={[Type.footnoteEmphasized, styles.flex, { color: theme.primary }]}>
+                {t('trip.sharing')}
+              </Text>
+            </View>
+            <Button label={t('job.arrived')} icon="location" variant="secondary" onPress={arrive} disabled={busy} />
+          </View>
         ) : (
-          <Button label={t('job.arrived')} icon="location" variant="secondary" onPress={arrive} disabled={busy} />
+          <View style={{ gap: 10 }}>
+            <Button label={t('trip.depart')} icon="paper-plane" onPress={depart} disabled={busy} />
+            <Button label={t('job.arrived')} icon="location" variant="secondary" onPress={arrive} disabled={busy} />
+          </View>
         )}
 
         {/* ---- How it ends ---- */}

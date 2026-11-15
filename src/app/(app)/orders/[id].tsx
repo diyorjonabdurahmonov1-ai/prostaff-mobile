@@ -17,6 +17,7 @@ import { Row, Section } from '@/components/ui/list';
 import { PhotoSlider } from '@/components/ui/photo-slider';
 import { Screen } from '@/components/ui/screen';
 import { AppMap } from '@/components/app-map';
+import { LiveTracker } from '@/components/live-tracker';
 import { Layout, Radius, Squircle, Type } from '@/constants/theme';
 import { useCategories } from '@/hooks/use-categories';
 import { useRefresh } from '@/hooks/use-refresh';
@@ -396,6 +397,14 @@ export default function OrderDetailScreen() {
           looks for when a job is disputed, which is why they are shown at the
           width of the card and not as a row of thumbnails. */}
       <PhotoSlider uris={order.images} header={t('order.photo')} height={240} />
+
+      {/* The worker has set off: the customer watches them come, like a taxi. */}
+      {isCustomer && !isCompanyOrder && order.departed_at && !order.arrived_at &&
+      (order.status === 'accepted' || order.status === 'in_progress') ? (
+        <View style={styles.mapWrap}>
+          <LiveTracker orderId={order.id} />
+        </View>
+      ) : null}
 
       {hasCoords(order) ? (
         <View style={styles.mapWrap}>

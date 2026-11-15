@@ -293,6 +293,8 @@ export interface Order {
   cancelled_by?: 'customer' | 'worker' | 'company' | 'admin';
   /** When the worker said they had reached the customer. */
   arrived_at?: string;
+  /** When the worker said they had set off for the customer. */
+  departed_at?: string;
   /**
    * From when the customer may report that the worker never came. Present only
    * while a worker holds the job and has not arrived.

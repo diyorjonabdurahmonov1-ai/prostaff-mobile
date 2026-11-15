@@ -130,6 +130,18 @@ export interface MapMarker extends LatLng {
   hint?: string;
   /** Marker colour — defaults to the brand pin. */
   color?: 'primary' | 'success' | 'warning';
+  /**
+   * Initials. Given one, the marker is a round "person" bubble instead of the
+   * plain pin — what a worker on the map looks like.
+   */
+  label?: string;
+  /** Draws the green "online" dot on a bubble. */
+  online?: boolean;
+  /**
+   * Makes the marker a funny hopping character: `label` is the emoji, and `say`
+   * the speech bubble over its head. For the worker coming to the customer.
+   */
+  say?: string;
 }
 
 const PIN_COLORS: Record<NonNullable<MapMarker['color']>, string> = {
@@ -165,6 +177,9 @@ export function mapConfigJson(options: {
         coords: [m.lat, m.lng],
         hint: m.hint ?? '',
         color: PIN_COLORS[m.color ?? 'primary'],
+        label: m.label ?? '',
+        online: !!m.online,
+        say: m.say ?? '',
       })),
     })
       // Pin labels are user-entered; a stray "</script>" must not end the block.
@@ -221,6 +236,37 @@ export function buildMapHtml(options: {
       pointer-events: none; z-index: 4; transition: all .12s ease-out;
     }
     #shadow.lifted { width: 18px; margin-left: -9px; background: rgba(0,0,0,.18); }
+    /* A worker: a round initials badge on a little stalk, with an online dot. */
+    /* No position or transform here: MapLibre positions the marker element itself. */
+    .bubble { width: 44px; height: 54px; cursor: pointer; }
+    .bubble .face { position: absolute; left: 0; top: 0; width: 38px; height: 38px;
+      border-radius: 50%; border: 3px solid #fff; color: #fff; font: 700 14px/32px sans-serif;
+      text-align: center; box-shadow: 0 4px 12px rgba(10,10,10,.28);
+      animation: pop .35s cubic-bezier(.2,1.4,.4,1) both; }
+    .bubble .tail { position: absolute; left: 14px; top: 34px; width: 12px; height: 12px;
+      transform: rotate(45deg); border-radius: 2px; box-shadow: 2px 2px 4px rgba(10,10,10,.18); }
+    .bubble .dot { position: absolute; left: 28px; top: 28px; width: 12px; height: 12px;
+      border-radius: 50%; background: #12B76A; border: 2px solid #fff; }
+    .bubble .face, .bubble .tail { background: var(--c); }
+    /* The worker on the way: a hopping character with a dust puff and a speech bubble. */
+    .fun { width: 60px; height: 70px; cursor: pointer; }
+    .fun .em { position: absolute; left: 8px; top: 18px; font-size: 38px; line-height: 44px;
+      animation: hop .5s ease-in-out infinite alternate; }
+    .fun .em::before { content: '\\1F4A8'; position: absolute; left: -22px; top: 8px; font-size: 18px;
+      opacity: .75; animation: puff .5s ease-in-out infinite alternate; }
+    .fun .sh { position: absolute; left: 14px; bottom: 6px; width: 32px; height: 8px; border-radius: 50%;
+      background: rgba(0,0,0,.25); animation: shrink .5s ease-in-out infinite alternate; }
+    .fun .say { position: absolute; left: 50%; bottom: 66px; transform: translateX(-50%);
+      white-space: nowrap; background: #fff; color: #0A0A0A; border-radius: 12px; padding: 5px 10px;
+      font: 700 11px/1.2 sans-serif; box-shadow: 0 4px 14px rgba(10,10,10,.25); }
+    .fun .say::after { content: ''; position: absolute; left: 50%; bottom: -5px; margin-left: -5px;
+      width: 10px; height: 10px; background: #fff; transform: rotate(45deg); }
+    @keyframes hop { from { transform: translateY(0) rotate(-6deg); } to { transform: translateY(-9px) rotate(6deg); } }
+    @keyframes puff { from { opacity: .2; transform: translateX(4px) scale(.7); } to { opacity: .8; transform: translateX(-4px) scale(1.1); } }
+    @keyframes shrink { from { transform: scale(1); } to { transform: scale(.65); opacity: .6; } }
+    @keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+    .maplibregl-popup-content { border-radius: 12px; padding: 7px 11px; font: 600 12px sans-serif;
+      box-shadow: 0 6px 18px rgba(10,10,10,.2); }
   </style>
 </head>
 <body>
@@ -303,18 +349,82 @@ export function buildMapHtml(options: {
           paint: { 'line-color': '#1B6EF3', 'line-opacity': 0.7, 'line-width': 2 } });
       }
 
+      // Slide a marker to a new spot instead of teleporting it.
+      function glide(marker, to) {
+        var from = marker.getLngLat();
+        var t0 = null, ms = 900;
+        function step(t) {
+          if (t0 === null) t0 = t;
+          var k = Math.min(1, (t - t0) / ms);
+          k = k * (2 - k);
+          marker.setLngLat([from.lng + (to[0] - from.lng) * k, from.lat + (to[1] - from.lat) * k]);
+          if (k < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }
+
       function drawPins(list) {
+        // Same markers as before (a worker driving): move them, do not rebuild
+        // them — rebuilding replays the pop-in and makes the map flicker.
+        if (markers.length === list.length && list.every(function (m, i) {
+          return markers[i].__key === m.color + '|' + m.online + '|' + (m.say ? 'fun' : m.label);
+        })) {
+          list.forEach(function (m, i) {
+            glide(markers[i], [m.coords[1], m.coords[0]]);
+            var el = markers[i].getElement();
+            // The character and what it says change as the worker gets closer.
+            if (el.__say && el.__say.textContent !== m.say) el.__say.textContent = m.say;
+            if (el.__em && el.__em.textContent !== m.label) el.__em.textContent = m.label;
+          });
+          return;
+        }
         markers.forEach(function (m) { m.remove(); });
         markers = list.map(function (m) {
-          var el = document.createElement('img');
-          el.src = pinSvg(m.color);
-          el.style.width = '34px';
-          el.style.height = '42px';
+          var el;
+          if (m.say) {
+            el = document.createElement('div');
+            el.className = 'fun';
+            var bubbleSay = document.createElement('div');
+            bubbleSay.className = 'say';
+            bubbleSay.textContent = m.say;
+            var shadowEl = document.createElement('div');
+            shadowEl.className = 'sh';
+            var emoji = document.createElement('div');
+            emoji.className = 'em';
+            emoji.textContent = m.label;
+            el.appendChild(bubbleSay);
+            el.appendChild(shadowEl);
+            el.appendChild(emoji);
+            el.__say = bubbleSay;
+            el.__em = emoji;
+          } else if (m.label) {
+            el = document.createElement('div');
+            el.className = 'bubble';
+            el.style.setProperty('--c', m.color);
+            var face = document.createElement('div');
+            face.className = 'face';
+            face.textContent = m.label;
+            var tail = document.createElement('div');
+            tail.className = 'tail';
+            el.appendChild(tail);
+            el.appendChild(face);
+            if (m.online) {
+              var dot = document.createElement('div');
+              dot.className = 'dot';
+              el.appendChild(dot);
+            }
+          } else {
+            el = document.createElement('img');
+            el.src = pinSvg(m.color);
+            el.style.width = '34px';
+            el.style.height = '42px';
+          }
           var marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
             .setLngLat([m.coords[1], m.coords[0]]);
-          if (m.hint) {
-            marker.setPopup(new maplibregl.Popup({ offset: 40, closeButton: false }).setText(m.hint));
+          if (m.hint && !m.say) {
+            marker.setPopup(new maplibregl.Popup({ offset: 46, closeButton: false }).setText(m.hint));
           }
+          marker.__key = m.color + '|' + m.online + '|' + (m.say ? 'fun' : m.label);
           return marker.addTo(map);
         });
       }
