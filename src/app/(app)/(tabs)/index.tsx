@@ -38,6 +38,7 @@ import {
   SearchPill,
   ServicesGrid,
 } from '@/components/home-sections';
+import { NotificationBell } from '@/components/notification-bell';
 import { OnlineCompaniesCarousel } from '@/components/online-companies-carousel';
 import { AppMap } from '@/components/app-map';
 import { useCategories } from '@/hooks/use-categories';
@@ -190,18 +191,7 @@ export default function HomeScreen() {
           {/* What happened while they were away. The worker panel has carried
               this since it was built; a customer waiting on somebody to accept
               their job has just as much reason to look. */}
-          <Pressable
-            onPress={() => router.push('/notifications')}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel={t('push.title')}
-            style={({ pressed }) => [
-              styles.bell,
-              { backgroundColor: theme.surface },
-              pressed && styles.pressed,
-            ]}>
-            <Icon name="notifications" size={22} color={theme.text} />
-          </Pressable>
+          <NotificationBell size={22} style={[styles.bell, { backgroundColor: theme.surface }]} />
           <Avatar name={userName} imageUrl={user?.avatar_url} size={44} />
         </View>
 

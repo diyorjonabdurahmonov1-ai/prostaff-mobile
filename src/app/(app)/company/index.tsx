@@ -16,6 +16,7 @@ import { AlertBannerList } from '@/components/alert-banner';
 import { BackgroundAccessCard } from '@/components/background-access-card';
 import { LiveLocationCard } from '@/components/live-location-card';
 import { LOCATION_COPY, LocationBanner } from '@/components/location-banner';
+import { NotificationBell } from '@/components/notification-bell';
 import { OnlineToggle } from '@/components/online-toggle';
 import { WorkRequirementsCard } from '@/components/work-requirements-card';
 import { useWorkRequirements } from '@/hooks/use-work-requirements';
@@ -172,7 +173,13 @@ export default function CompanyPanelScreen() {
       {/* No back chevron: this screen is the root of the app for a firm, the
           same way the worker panel is for a worker. It used to draw one, which
           at the root either did nothing or walked out of the account. */}
-      <Header title={profile.name} large subtitle={t('company.panelTitle')} back={false} />
+      <Header
+        title={profile.name}
+        large
+        subtitle={t('company.panelTitle')}
+        back={false}
+        right={<NotificationBell />}
+      />
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: PROVIDER_NAV_HEIGHT + insets.bottom + 32 }]}

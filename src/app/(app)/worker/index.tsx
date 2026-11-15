@@ -15,6 +15,7 @@ import { AlertBannerList } from '@/components/alert-banner';
 import { BalanceCard } from '@/components/balance-card';
 import { IncomingOrderCard } from '@/components/incoming-order-card';
 import { CountUp, FadeUp } from '@/components/motion';
+import { NotificationBell } from '@/components/notification-bell';
 import { OnlineToggle } from '@/components/online-toggle';
 import { PROVIDER_NAV_HEIGHT, ProviderNav } from '@/components/provider-nav';
 import { Avatar } from '@/components/ui/avatar';
@@ -23,7 +24,7 @@ import { Header } from '@/components/ui/header';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Layout, Radius, Squircle, Stagger, Type } from '@/constants/theme';
 import { useRefresh } from '@/hooks/use-refresh';
-import { getPreciseFix, useLiveLocation, type LocationStatus } from '@/hooks/use-live-location';
+import { getPreciseFix, useLiveLocation } from '@/hooks/use-live-location';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { api } from '@/lib/api';
@@ -234,26 +235,9 @@ export default function WorkerPanelScreen() {
               shaped like "what have I missed" was the only one that could not
               answer it, and everything the server had filed against the account
               sat on a screen nothing pointed at. */}
-          <Pressable
-            onPress={() => router.push('/notifications')}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel={t('push.title')}
-            style={({ pressed }) => [styles.bell, pressed && styles.pressed]}
-          >
-            <Icon name="notifications" size={24} color={theme.text} />
-            {incoming.length > 0 || activeOrder ? (
-              <View
-                style={[
-                  styles.bellDot,
-                  {
-                    backgroundColor: incoming.length > 0 ? theme.success : theme.warning,
-                    borderColor: theme.background,
-                  },
-                ]}
-              />
-            ) : null}
-          </Pressable>
+          <NotificationBell
+            dotColor={incoming.length > 0 ? theme.success : activeOrder ? theme.warning : null}
+          />
         </FadeUp>
 
         {/* ---- Why work may not be arriving ---- */}
@@ -506,17 +490,6 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: Radius.pill,
   },
-  bell: { padding: 4 },
-  bellDot: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 2,
-  },
-
   hint: { marginTop: 10, paddingHorizontal: 4 },
 
   incoming: { marginTop: 24, gap: 12 },
