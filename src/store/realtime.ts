@@ -577,6 +577,7 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
               if (
                 (n.type === 'order.new' || n.type === 'order.invite') &&
                 AppState.currentState !== 'active' &&
+                !(age > STALE_BANNER_MS) &&
                 onlineRef.current
               ) {
                 ringBubble(n.title || 'Yangi buyurtma!');
