@@ -34,7 +34,6 @@ import type { WorkerProfile } from '@/lib/types';
 import { useAuth } from '@/store/auth';
 import { useAlerts, useWorkerOrders } from '@/store/realtime';
 import { Backdrop } from '@/components/backdrop';
-import { BackgroundAccessCard } from '@/components/background-access-card';
 import { WorkRequirementsCard } from '@/components/work-requirements-card';
 import { LOCATION_COPY, LocationBanner } from '@/components/location-banner';
 import { useWorkRequirements } from '@/hooks/use-work-requirements';
@@ -291,7 +290,6 @@ export default function WorkerPanelScreen() {
             <LocationBanner status={location.status} onFix={location.fix} />
           ) : null}
           {requirementsMissing ? <WorkRequirementsCard requirements={requirements} /> : null}
-          {!locationBlocked && !requirementsMissing ? <BackgroundAccessCard /> : null}
           <OnlineToggle
             online={online}
             disabled={busy}
