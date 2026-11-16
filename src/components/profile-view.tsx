@@ -11,6 +11,7 @@
  * bottom padding for its own nav bar, and the customer tab adds pull-to-refresh.
  */
 
+import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
@@ -425,7 +426,7 @@ export function ProfileView({ children }: ProfileViewProps) {
       </Section>
 
       <Text style={[Type.caption1, styles.version, { color: theme.textTertiary }]}>
-        {t('common.appName')} · 1.0.0
+        {t('common.appName')} · {Constants.expoConfig?.version ?? ''}
       </Text>
     </>
   );
