@@ -13,7 +13,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ActiveJobCard } from '@/components/active-job-card';
 import { AlertBannerList } from '@/components/alert-banner';
-import { BackgroundAccessCard } from '@/components/background-access-card';
 import { LiveLocationCard } from '@/components/live-location-card';
 import { LOCATION_COPY, LocationBanner } from '@/components/location-banner';
 import { NotificationBell } from '@/components/notification-bell';
@@ -224,9 +223,6 @@ export default function CompanyPanelScreen() {
         {/* Where orders come from: the office, and — for a firm that goes out
             to its customers — where it is right now. */}
         <View style={styles.live}>
-          {/* Only a firm that is followed on the road needs the phone to keep
-              the app awake. */}
-          {profile.live_location ? <BackgroundAccessCard /> : null}
           <LiveLocationCard firm={profile} onChanged={refreshMe} />
         </View>
 
