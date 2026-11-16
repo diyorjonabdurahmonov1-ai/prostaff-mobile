@@ -233,7 +233,7 @@ export default function AdminUserDetailScreen() {
           {wp ? (
             <Row
               title={t('worker.myPrices')}
-              value={`${formatSom(wp.price_min)} – ${formatSom(wp.price_max)}`}
+              value={`${formatSom(wp.price_min)}`}
             />
           ) : null}
           {wp ? <Row title="Manzil" value={`${wp.lat.toFixed(3)}, ${wp.lng.toFixed(3)}`} /> : null}

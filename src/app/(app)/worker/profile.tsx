@@ -121,10 +121,6 @@ export default function WorkerProfileScreen() {
                   value={`${formatSom(profile.price_min)} ${t('common.som')}`}
                 />
                 <Row
-                  title={t('worker.priceMax')}
-                  value={`${formatSom(profile.price_max)} ${t('common.som')}`}
-                />
-                <Row
                   title={t('order.gender')}
                   value={profile.gender === 'female' ? t('order.female') : t('order.male')}
                 />

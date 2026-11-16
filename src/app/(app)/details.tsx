@@ -25,9 +25,10 @@ import { useCategories } from '@/hooks/use-categories';
 import { useTheme } from '@/hooks/use-theme';
 import { useI18n, useT } from '@/i18n';
 import { categoryIcon } from '@/lib/category-icon';
-import { categoryName } from '@/lib/format';
+import { categoryName, formatSom } from '@/lib/format';
 import { MAX_ORDER_PHOTOS } from '@/lib/image';
 import { getCoordsWithFallback } from '@/lib/location';
+import { api } from '@/lib/api';
 import { pickAndUploadImage } from '@/lib/upload';
 import type { Gender } from '@/lib/types';
 import { useAuth } from '@/store/auth';
@@ -73,6 +74,31 @@ export default function DetailsScreen() {
    * the count is how many were named.
    */
   const asksHowMany = draft.targetWorkerIds.length === 0;
+
+  // A worker's minimum price: an offer below it never reaches them. Looked up
+  // for the people chosen by hand so the customer hears it here, while the
+  // price is being typed, not as a refusal after pressing send.
+  const [targetMin, setTargetMin] = useState(0);
+  const targetKey = draft.targetWorkerIds.join(',');
+  useEffect(() => {
+    if (!targetKey) return;
+    let live = true;
+    Promise.all(
+      targetKey.split(',').map((id) =>
+        api
+          .get<{ price_min: number }>(`/workers/${id}`)
+          .then((w) => w.price_min || 0)
+          .catch(() => 0)
+      )
+    ).then((mins) => {
+      if (live) setTargetMin(Math.max(0, ...mins));
+    });
+    return () => {
+      live = false;
+    };
+  }, [targetKey]);
+  const minPrice = targetKey ? targetMin : 0;
+  const priceTooLow = minPrice > 0 && Number(draft.price) > 0 && Number(draft.price) < minPrice;
 
   const [locating, setLocating] = useState(!draft.locationResolved);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -142,6 +168,7 @@ export default function DetailsScreen() {
     draft.description.trim().length > 0 &&
     draft.phone.trim().length > 0 &&
     Number(draft.price) > 0 &&
+    !priceTooLow &&
     draft.locationResolved;
 
   return (
@@ -268,6 +295,7 @@ export default function DetailsScreen() {
             // With several workers chosen this figure is what each of them is
             // paid, not what the job costs — said here, where it is typed,
             // rather than only on the review screen after the fact.
+            error={priceTooLow ? t('order.priceBelowMin', { min: formatSom(minPrice) }) : undefined}
             hint={
               draft.targetWorkerIds.length > 1
                 ? t('order.priceEachHint')

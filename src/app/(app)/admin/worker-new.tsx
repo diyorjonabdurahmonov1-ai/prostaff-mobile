@@ -58,7 +58,6 @@ export default function AdminWorkerNewScreen() {
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [age, setAge] = useState('');
   const [priceMin, setPriceMin] = useState('50000');
-  const [priceMax, setPriceMax] = useState('150000');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [lat, setLat] = useState(String(TASHKENT.lat));
   const [lng, setLng] = useState(String(TASHKENT.lng));
@@ -120,7 +119,7 @@ export default function AdminWorkerNewScreen() {
         gender,
         age: Number(age),
         price_min: Number(priceMin) || 0,
-        price_max: Number(priceMax) || 0,
+        price_max: 0,
         lat: Number(lat) || TASHKENT.lat,
         lng: Number(lng) || TASHKENT.lng,
         category_ids: Array.from(selected),
@@ -261,14 +260,6 @@ export default function AdminWorkerNewScreen() {
                 label="Eng kam narx"
                 value={priceMin}
                 onChangeText={(v) => setPriceMin(v.replace(/\D/g, ''))}
-                keyboardType="number-pad"
-              />
-            </View>
-            <View style={styles.rowItem}>
-              <TextField
-                label="Eng yuqori narx"
-                value={priceMax}
-                onChangeText={(v) => setPriceMax(v.replace(/\D/g, ''))}
                 keyboardType="number-pad"
               />
             </View>

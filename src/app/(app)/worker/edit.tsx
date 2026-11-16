@@ -47,7 +47,6 @@ export default function WorkerEditScreen() {
   const profile = user?.worker_profile;
 
   const [priceMin, setPriceMin] = useState(String(profile?.price_min ?? 0));
-  const [priceMax, setPriceMax] = useState(String(profile?.price_max ?? 0));
   const [selected, setSelected] = useState<Set<string>>(new Set(profile?.category_ids ?? []));
 
   /**
@@ -115,7 +114,6 @@ export default function WorkerEditScreen() {
     try {
       await api.patch<WorkerProfile>('/worker/profile', {
         price_min: Number(priceMin) || 0,
-        price_max: Number(priceMax) || 0,
         category_ids: Array.from(selected),
         avatar_url: avatarUrl,
         about: about.trim(),
@@ -210,10 +208,13 @@ export default function WorkerEditScreen() {
 
         <View style={styles.priceRow}>
           <View style={styles.priceItem}>
-            <TextField label={t('worker.priceMin')} value={priceMin} onChangeText={setPriceMin} keyboardType="number-pad" />
-          </View>
-          <View style={styles.priceItem}>
-            <TextField label={t('worker.priceMax')} value={priceMax} onChangeText={setPriceMax} keyboardType="number-pad" />
+            <TextField
+              label={t('worker.priceMin')}
+              value={priceMin}
+              onChangeText={(v) => setPriceMin(v.replace(/\D/g, ''))}
+              keyboardType="number-pad"
+              hint={t('worker.priceMinHint')}
+            />
           </View>
         </View>
 
