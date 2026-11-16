@@ -118,6 +118,8 @@ export default function HomeScreen() {
   // while navigation is on its way to another tab, and a redirect fired then
   // would bounce the user off the screen they actually asked for.
   const pathname = usePathname();
+  // The redirect above never took: show the home instead of holding a blank.
+  const [redirectFailed, setRedirectFailed] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -135,7 +137,29 @@ export default function HomeScreen() {
        * between their four screens on their own bottom bar, and switching back
        * to the customer side replaces the root again from the profile.
        */
-      if (panel && pathname === '/') switchRoot(panel);
+      if (!(panel && pathname === '/')) return;
+      /**
+       * Tried again until it takes.
+       *
+       * Straight after the app starts the navigator can still be getting ready
+       * and quietly drop the redirect — and this screen holds a blank frame while
+       * it waits, so a dropped redirect was a dead screen (just the background and
+       * the tab bar) until the app was left and re-entered. Retried every
+       * moment for a few seconds; a redirect that still has not happened by then
+       * gives the customer home back rather than a blank.
+       */
+      let tries = 0;
+      switchRoot(panel);
+      const timer = setInterval(() => {
+        tries += 1;
+        if (tries > 6) {
+          clearInterval(timer);
+          setRedirectFailed(true);
+          return;
+        }
+        switchRoot(panel);
+      }, 700);
+      return () => clearInterval(timer);
     }, [panel, pathname])
   );
 
@@ -164,7 +188,7 @@ export default function HomeScreen() {
   // Hold a blank frame while the push above runs. Painting the customer home
   // first and swapping it out a frame later is what made switching modes look
   // like the app had thrown the user back into the customer account.
-  if (panel && pathname === '/') {
+  if (panel && pathname === '/' && !redirectFailed) {
     return <View style={[styles.safe, { backgroundColor: theme.background }]} />;
   }
 

@@ -22,9 +22,16 @@ import { router, type Href } from 'expo-router';
  * the ordinary case, not an error, and this is called on both directions of the
  * switch.
  */
-export function switchRoot(href: Href) {
-  if (router.canDismiss()) router.dismissAll();
-  router.replace(href);
+export function switchRoot(href: Href): boolean {
+  // Right after the app starts the navigator may not be ready to be told
+  // anything yet; that is reported, not thrown, so the caller can try again.
+  try {
+    if (router.canDismiss()) router.dismissAll();
+    router.replace(href);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
