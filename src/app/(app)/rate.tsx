@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   StyleSheet,
   View,
 } from 'react-native';
@@ -14,7 +15,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Layout, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { finishFlow } from '@/lib/nav';
 import type { Rating } from '@/lib/types';
 
@@ -39,8 +40,16 @@ export default function RateScreen() {
         comment: comment.trim() || undefined,
       });
       setDone(true);
-    } catch {
+    } catch (err) {
       setBusy(false);
+      // Already rated (a second tap, or from another phone): that is the same as
+      // done, not an error to show. Anything else is said out loud — it used to
+      // be swallowed, and the button just came back.
+      if (err instanceof ApiError && err.code === 'already_rated') {
+        setDone(true);
+        return;
+      }
+      Alert.alert(t('common.error'), err instanceof Error && err.message ? err.message : t('common.genericError'));
     }
   };
 
