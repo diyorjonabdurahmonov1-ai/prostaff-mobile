@@ -707,7 +707,7 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
   const { lang } = useI18n();
   const theme = useTheme();
   const router = useRouter();
-  const { categories, activeCategories } = useCategories();
+  const { categories, activeCategories, loading: categoriesLoading } = useCategories();
   const { reset } = useOrderFlow();
   /**
    * What kind of help is needed, asked first.
@@ -858,6 +858,7 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
       <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
         <Header title={t('customer.workers')} large back onBack={onBack} subtitle={t('pick.whatKind')} />
         <ScrollView contentContainerStyle={styles.listScroll} showsVerticalScrollIndicator={false}>
+          {categoriesLoading && activeCategories.length === 0 ? <LoadingState /> : null}
           <View style={styles.catGrid}>
             {activeCategories.map((c) => (
               <Pressable
@@ -889,7 +890,12 @@ function WorkersListScreen({ onBack }: { onBack: () => void }) {
         title={t('customer.workers')}
         large
         back
-        onBack={onBack}
+        // One step back first: from the list to the choice of service, and only
+        // then out of the screen.
+        onBack={() => {
+          setCategoryId(null);
+          setChosen([]);
+        }}
         subtitle={chosen.length > 1 ? t('pick.subtitleMany') : t('pick.subtitle')}
       />
 
