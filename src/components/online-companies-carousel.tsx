@@ -134,7 +134,10 @@ export function OnlineCompaniesCarousel() {
       .join(', ') ||
     c.description;
 
-  if (!loading && firms.length === 0) return null;
+  // Nothing is drawn until there is something to show: a header and a grey
+  // placeholder that vanish a moment later, because nobody is online, is worse
+  // than a home that simply has no shelf.
+  if (loading || firms.length === 0) return null;
 
   return (
     <View style={styles.section}>
@@ -382,7 +385,7 @@ function Dot({
 }
 
 const styles = StyleSheet.create({
-  section: { marginBottom: 24 },
+  section: { marginTop: 28, marginBottom: 24 },
   head: {
     flexDirection: 'row',
     alignItems: 'center',
