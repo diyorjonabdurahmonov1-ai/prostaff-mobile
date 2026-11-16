@@ -496,13 +496,33 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
+    // One read at a time. Opening the app starts the first read, and the socket
+    // connecting a moment later asks for another before the first has come
+    // back — both with no watermark, so both got the whole inbox. The first
+    // marked the pass as primed; the second then showed every old message as a
+    // new banner: yesterday's orders and a top-up from two months ago, all at
+    // once. A read asked for while one is running waits and runs after it.
+    let running = false;
+    let again = false;
+
     const tick = async () => {
+      if (running) {
+        again = true;
+        return;
+      }
+      running = true;
       timer = null;
       try {
         const since = sinceRef.current;
-        const fresh = await api.get<AppNotification[]>('/notifications', {
+        const got = await api.get<AppNotification[]>('/notifications', {
           query: since ? { since } : undefined,
         });
+        // Whatever the watermark became while this was in flight, nothing at or
+        // before it is new.
+        const mark = sinceRef.current ? Date.parse(sinceRef.current) : NaN;
+        const fresh = Number.isNaN(mark)
+          ? got
+          : got?.filter((n) => Date.parse(n.created_at) > mark);
         if (!cancelled && fresh && fresh.length > 0) {
           // Watermark forward so each poll only asks for what is new. The list
           // comes back newest-first, so that is `fresh[0]` — taking the last
@@ -538,8 +558,14 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
       } catch {
         // swallow — the next tick retries
       } finally {
-        catchUpRef.current = false;
-        scheduleNext();
+        running = false;
+        if (again && !cancelled) {
+          again = false;
+          tick();
+        } else {
+          catchUpRef.current = false;
+          scheduleNext();
+        }
       }
     };
 
