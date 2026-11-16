@@ -14,6 +14,7 @@ import { PushDiagnostics } from '@/components/push-diagnostics';
 
 interface AppSettings {
   commission_percent: number;
+  commission_fixed?: number;
   min_balance: number;
 }
 
@@ -36,6 +37,7 @@ export default function AdminSettingsScreen() {
         if (d) {
           setSettings({
             commission_percent: d.commission_percent ?? 10,
+            commission_fixed: d.commission_fixed ?? 0,
             min_balance: d.min_balance ?? 10000,
           });
         }
@@ -97,7 +99,11 @@ export default function AdminSettingsScreen() {
             iconColor="#FF2D55"
             title="Komissiya"
             subtitle="Har bir ishdan"
-            value={`${settings.commission_percent}%`}
+            value={
+              (settings.commission_fixed ?? 0) > 0
+                ? `${formatSom(settings.commission_fixed ?? 0)} ${t('common.som')}`
+                : `${settings.commission_percent}%`
+            }
           />
         </Section>
 
