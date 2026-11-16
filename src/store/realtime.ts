@@ -475,6 +475,17 @@ export function usePollOrder(orderId: string | null, options: PollOrderOptions =
 export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INTERVAL) {
   const sinceRef = useRef<string | null>(null);
   const primedRef = useRef(false);
+  /**
+   * The next read is catching up on a stay away, not seeing something new.
+   *
+   * A phone that was left with the app behind another one (not swiped away) had
+   * already been told about everything that happened meanwhile — by the server's
+   * push, in the tray, overnight. On coming back, this hook read the same
+   * messages as "new" and showed each of them a second time, so an order that had
+   * expired in the night was announced again over breakfast. A read right after
+   * the app comes back only moves the watermark forward.
+   */
+  const catchUpRef = useRef(false);
 
   useEffect(() => {
     if (!enabled) {
@@ -500,7 +511,7 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
           sinceRef.current = fresh[0].created_at;
           // The first pass only establishes the watermark — otherwise opening
           // the app would replay every old message as a fresh banner.
-          if (primedRef.current) {
+          if (primedRef.current && !catchUpRef.current) {
             for (const n of fresh) {
               // Out of sight, the server's push has already told them; showing
               // the same message again from here is the second ring.
@@ -527,9 +538,25 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
       } catch {
         // swallow — the next tick retries
       } finally {
+        catchUpRef.current = false;
         scheduleNext();
       }
     };
+
+    // Coming back to the app: one read that only catches up (see catchUpRef).
+    let wasAway = AppState.currentState !== 'active';
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') {
+        wasAway = true;
+        return;
+      }
+      if (!wasAway) return;
+      wasAway = false;
+      catchUpRef.current = true;
+      if (timer) clearTimeout(timer);
+      timer = null;
+      tick();
+    });
 
     function scheduleNext() {
       if (cancelled || timer || socket.connected) return;
@@ -575,6 +602,7 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
+      appStateSub.remove();
       unsubscribeStatus();
       unsubscribeSocket();
       unsubscribeReconnect();
