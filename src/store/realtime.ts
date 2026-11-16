@@ -24,6 +24,7 @@ import { api } from '@/lib/api';
 import { onOrderAlert, presentLocalNotification } from '@/lib/notifications';
 import { bringToFront, ringBubble } from '@/lib/overlay';
 import { socket } from '@/lib/socket';
+import { useAuth } from '@/store/auth';
 import type { AppAlert, AppNotification, Order, OrderStatus, Role } from '@/lib/types';
 
 /**
@@ -278,6 +279,26 @@ export function useCompanyOrders(enabled: boolean, intervalMs = DEFAULT_INTERVAL
 }
 
 /**
+ * Whether the signed-in worker or firm is online right now, as a ref so the
+ * polling loops can read it without restarting.
+ *
+ * The pill over other apps is for somebody who is online and away. Both loops
+ * below run for every account that has a worker or firm profile, online or not,
+ * and used to raise the pill (and drag the app to the front) for anything they
+ * found — so an offline provider coming back to the phone found "Yangi
+ * buyurtma!" hanging over their screen with nothing behind it.
+ */
+function useProviderOnlineRef() {
+  const { user } = useAuth();
+  const online = !!(user?.worker_profile?.online || user?.company_profile?.online);
+  const ref = useRef(online);
+  useEffect(() => {
+    ref.current = online;
+  }, [online]);
+  return ref;
+}
+
+/**
  * Announces new invites in the notification tray.
  *
  * Mounted once at the app root for workers. The card in the list is where the
@@ -288,6 +309,7 @@ export function useCompanyOrders(enabled: boolean, intervalMs = DEFAULT_INTERVAL
 export function useInviteAlerts(enabled: boolean, intervalMs = DEFAULT_INTERVAL) {
   const announcedRef = useRef<Set<string>>(new Set());
   const primedRef = useRef(false);
+  const onlineRef = useProviderOnlineRef();
 
   useEffect(() => {
     if (!enabled) return;
@@ -303,7 +325,7 @@ export function useInviteAlerts(enabled: boolean, intervalMs = DEFAULT_INTERVAL)
           announcedRef.current.add(order.id);
           // The first pass only records what is already open — opening the app
           // should not replay every invite as a fresh banner.
-          if (primedRef.current) {
+          if (primedRef.current && onlineRef.current) {
             presentLocalNotification({
               title: 'Yangi buyurtma!',
               body: order.description || undefined,
@@ -311,7 +333,7 @@ export function useInviteAlerts(enabled: boolean, intervalMs = DEFAULT_INTERVAL)
             });
             // With the app out of sight, the bubble turns into an alert and the
             // app comes back to the front, so the order is on screen at once.
-            if (AppState.currentState !== 'active') {
+            if (AppState.currentState !== 'active' && onlineRef.current) {
               ringBubble('Yangi buyurtma!');
               bringToFront();
             }
@@ -363,7 +385,7 @@ export function useInviteAlerts(enabled: boolean, intervalMs = DEFAULT_INTERVAL)
       unsubscribeStatus();
       unsubscribeSocket();
     };
-  }, [enabled, intervalMs]);
+  }, [enabled, intervalMs, onlineRef]);
 }
 
 const TERMINAL_STATUSES: OrderStatus[] = ['completed', 'cancelled', 'rejected', 'expired'];
@@ -474,6 +496,7 @@ export function usePollOrder(orderId: string | null, options: PollOrderOptions =
  */
 export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INTERVAL) {
   const sinceRef = useRef<string | null>(null);
+  const onlineRef = useProviderOnlineRef();
   const primedRef = useRef(false);
   /**
    * The next read is catching up on a stay away, not seeing something new.
@@ -526,7 +549,8 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
               // into an alert and the app comes to the front, as for a worker.
               if (
                 (n.type === 'order.new' || n.type === 'order.invite') &&
-                AppState.currentState !== 'active'
+                AppState.currentState !== 'active' &&
+                onlineRef.current
               ) {
                 ringBubble(n.title || 'Yangi buyurtma!');
                 bringToFront();
@@ -607,7 +631,7 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
       unsubscribeSocket();
       unsubscribeReconnect();
     };
-  }, [enabled, intervalMs]);
+  }, [enabled, intervalMs, onlineRef]);
 }
 
 /**
