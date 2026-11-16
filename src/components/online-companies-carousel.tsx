@@ -300,7 +300,7 @@ function FirmCard({
             </Animated.View>
           ) : (
             <LinearGradient
-              colors={[Gradients.company[0], Gradients.brand[1]]}
+              colors={[Gradients.brand[0], Gradients.brand[1]]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFill}>

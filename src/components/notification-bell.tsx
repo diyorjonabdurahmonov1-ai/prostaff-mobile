@@ -22,7 +22,10 @@ export function NotificationBell({
   size = 24,
   style,
   dotColor,
+  color,
 }: {
+  /** The bell's colour, for use on a coloured surface. */
+  color?: string;
   size?: number;
   style?: StyleProp<ViewStyle>;
   /**
@@ -53,7 +56,7 @@ export function NotificationBell({
       accessibilityRole="button"
       accessibilityLabel={unread > 0 ? `${t('push.title')}: ${unread}` : t('push.title')}
       style={({ pressed }) => [styles.bell, style, pressed && styles.pressed]}>
-      <Icon name="notifications" size={size} color={theme.text} />
+      <Icon name="notifications" size={size} color={color ?? theme.text} />
       {unread > 0 ? (
         <View style={[styles.badge, { backgroundColor: theme.danger, borderColor: theme.background }]}>
           <Text style={[Type.caption2Emphasized, styles.badgeText]}>{unread > 9 ? '9+' : unread}</Text>

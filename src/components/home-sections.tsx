@@ -19,7 +19,8 @@ import { Avatar } from '@/components/ui/avatar';
 import { StatusPill } from '@/components/ui/badge';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { PressableScale } from '@/components/ui/pressable-scale';
-import { Layout, MaxContentWidth, Radius, Shadow, Squircle, Type } from '@/constants/theme';
+import { Gradients, Layout, MaxContentWidth, Radius, Shadow, Squircle, Type } from '@/constants/theme';
+import { NotificationBell } from '@/components/notification-bell';
 import { useCategories } from '@/hooks/use-categories';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { useI18n, useT } from '@/i18n';
@@ -56,6 +57,104 @@ export function SearchPill() {
       scaleTo={0.985}
       accessibilityLabel={t('home.search')}
       style={[styles.searchWrap, dark ? null : Shadow.card]}>
+      <View style={[styles.search, Squircle, { backgroundColor: theme.surface }]}>
+        <Icon name="search" size={20} color={theme.primary} />
+        <Text style={[Type.body, styles.flex, { color: theme.textTertiary }]} numberOfLines={1}>
+          {t('home.search')}
+        </Text>
+      </View>
+    </PressableScale>
+  );
+}
+
+/* ===================== The hero ===================== */
+
+/** Good morning / afternoon / evening, from the phone's own clock. */
+function greetingKey(): 'home.goodMorning' | 'home.goodDay' | 'home.goodEvening' {
+  const h = new Date().getHours();
+  if (h < 11) return 'home.goodMorning';
+  if (h < 18) return 'home.goodDay';
+  return 'home.goodEvening';
+}
+
+/**
+ * The top of the home: who is asking, and the one question the app answers.
+ *
+ * One calm card in the brand colour carries the greeting, the notification bell,
+ * the profile photo and the search — instead of four unrelated things on a
+ * pastel page — with a live line saying how many workers are online around
+ * the customer right now, which is the best reason to start a search.
+ */
+export function HomeHero({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
+  const t = useT();
+  const [online, setOnline] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      let live = true;
+      (async () => {
+        try {
+          const here = await getCoordsWithFallback();
+          if (!here.resolved) return;
+          const data = await api.get<WorkerProfile[]>(
+            `/workers/nearby?lat=${here.lat}&lng=${here.lng}&radius_km=${NEARBY_KM}`,
+          );
+          if (live) setOnline((data ?? []).filter((w) => w.online && !w.banned).length);
+        } catch {
+          // The line is a nicety; the hero stands without it.
+        }
+      })();
+      return () => {
+        live = false;
+      };
+    }, []),
+  );
+
+  return (
+    <View style={styles.heroWrap}>
+      <LinearGradient
+        colors={[Gradients.brand[0], Gradients.brand[1]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.hero, Squircle]}>
+        {/* Soft discs off two corners: depth without a picture. */}
+        <View style={[styles.heroDisc, styles.heroDiscA]} />
+        <View style={[styles.heroDisc, styles.heroDiscB]} />
+
+        <View style={styles.heroTop}>
+          <View style={styles.flex}>
+            <Text style={[Type.subhead, styles.heroDim]}>{t(greetingKey())}</Text>
+            <Text style={[Type.largeTitle, styles.white]} numberOfLines={1}>
+              {name}
+            </Text>
+          </View>
+          <NotificationBell size={22} color="#FFFFFF" style={styles.heroGlass} />
+          <Avatar name={name} imageUrl={avatarUrl} size={44} />
+        </View>
+
+        <SearchPillInline />
+
+        {online > 0 ? (
+          <View style={styles.heroLive}>
+            <View style={styles.heroLiveDot} />
+            <Text style={[Type.footnoteEmphasized, styles.white]}>{t('home.onlineNow', { n: online })}</Text>
+          </View>
+        ) : null}
+      </LinearGradient>
+    </View>
+  );
+}
+
+/** The search field as it sits inside the hero: white, flat, no outer margins. */
+function SearchPillInline() {
+  const t = useT();
+  const theme = useTheme();
+  const router = useRouter();
+  return (
+    <PressableScale
+      onPress={() => router.push({ pathname: '/categories', params: { focus: '1' } })}
+      scaleTo={0.985}
+      accessibilityLabel={t('home.search')}>
       <View style={[styles.search, Squircle, { backgroundColor: theme.surface }]}>
         <Icon name="search" size={20} color={theme.primary} />
         <Text style={[Type.body, styles.flex, { color: theme.textTertiary }]} numberOfLines={1}>
@@ -117,7 +216,7 @@ export function ActiveOrderCard() {
         scaleTo={0.98}
         style={dark ? undefined : Shadow.card}>
         <View style={[styles.active, Squircle, { backgroundColor: theme.surface }]}>
-          <CategoryArt category={category} width={52} height={52} radius={14} />
+          <CategoryArt calm category={category} width={52} height={52} radius={14} />
           <View style={styles.flex}>
             <Text style={[Type.caption1Emphasized, { color: theme.primary }]}>
               {t('home.activeOrder').toUpperCase()}
@@ -255,7 +354,7 @@ export function ServicesGrid() {
             scaleTo={0.94}
             accessibilityLabel={categoryName(category, lang)}
             style={{ width: tile }}>
-            <CategoryArt category={category} width={tile} height={tile} radius={22} />
+            <CategoryArt calm category={category} width={tile} height={tile} radius={22} />
             <Text style={[Type.caption1, styles.serviceLabel, { color: theme.text }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.82}>
               {categoryName(category, lang)}
             </Text>
@@ -270,38 +369,35 @@ export function ServicesGrid() {
 
 function EntryCard({
   icon,
-  colors,
   title,
   subtitle,
   onPress,
 }: {
   icon: IconName;
-  colors: readonly [string, string];
   title: string;
   subtitle: string;
   onPress: () => void;
 }) {
+  const theme = useTheme();
   const dark = useThemeMode() === 'dark';
   return (
     <PressableScale onPress={onPress} scaleTo={0.97} accessibilityLabel={title} style={[styles.flex, dark ? null : Shadow.card]}>
-      <LinearGradient
-        colors={[colors[0], colors[1]]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.entry, Squircle]}>
-        <View style={styles.entryDisc} />
-        <View style={styles.entryGlyph}>
-          <Icon name={icon} size={22} color="#FFFFFF" />
+      <View style={[styles.entry, Squircle, { backgroundColor: theme.surface }]}>
+        <View style={[styles.entryGlyph, { backgroundColor: theme.primarySoft }]}>
+          <Icon name={icon} size={22} color={theme.primary} />
         </View>
         <View style={styles.entryText}>
-          <Text style={[Type.headline, styles.white]} numberOfLines={1}>
+          <Text style={[Type.headline, { color: theme.text }]} numberOfLines={1}>
             {title}
           </Text>
-          <Text style={[Type.caption1, styles.whiteDim]} numberOfLines={2}>
+          <Text style={[Type.caption1, { color: theme.textSecondary }]} numberOfLines={2}>
             {subtitle}
           </Text>
         </View>
-      </LinearGradient>
+        <View style={[styles.entryArrow, { backgroundColor: theme.fillTertiary }]}>
+          <Icon name="arrow-forward" size={14} color={theme.textSecondary} />
+        </View>
+      </View>
     </PressableScale>
   );
 }
@@ -313,14 +409,12 @@ export function EntryCards({ onFirms, onWorkers }: { onFirms: () => void; onWork
     <View style={[styles.block, styles.entries]}>
       <EntryCard
         icon="business"
-        colors={['#14B8A6', '#0F766E']}
         title={t('customer.companies')}
         subtitle={t('home.serviceCompanies')}
         onPress={onFirms}
       />
       <EntryCard
         icon="people"
-        colors={['#6366F1', '#4338CA']}
         title={t('home.pickWorkers')}
         subtitle={t('home.pickWorkersHint')}
         onPress={onWorkers}
@@ -420,6 +514,26 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
 
   searchWrap: { marginHorizontal: Layout.gutter },
+
+  heroWrap: { paddingHorizontal: Layout.gutter, paddingTop: 8 },
+  hero: { borderRadius: 28, padding: 18, gap: 14, overflow: 'hidden' },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  heroDim: { color: 'rgba(255,255,255,0.8)' },
+  heroGlass: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.18)' },
+  heroDisc: { position: 'absolute', borderRadius: 999, backgroundColor: '#FFFFFF' },
+  heroDiscA: { width: 200, height: 200, right: -70, top: -90, opacity: 0.1 },
+  heroDiscB: { width: 150, height: 150, left: -60, bottom: -80, opacity: 0.08 },
+  heroLive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  heroLiveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4ADE80' },
   search: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -444,24 +558,24 @@ const styles = StyleSheet.create({
 
   entries: { flexDirection: 'row', gap: 12 },
   entry: { borderRadius: Radius.xl, padding: 16, gap: 14, minHeight: 132, overflow: 'hidden' },
-  entryDisc: {
-    position: 'absolute',
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    right: -40,
-    top: -46,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-  },
   entryGlyph: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.22)',
   },
   entryText: { gap: 2 },
+  entryArrow: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   peopleScroll: { marginHorizontal: -Layout.gutter },
   people: { paddingHorizontal: Layout.gutter, gap: 10, paddingBottom: 8 },
