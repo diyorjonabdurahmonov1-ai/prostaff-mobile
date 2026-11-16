@@ -197,7 +197,10 @@ export function ProfileView({ children }: ProfileViewProps) {
               {userName}
             </Text>
             <Text style={[Type.footnote, { color: theme.textSecondary }]} numberOfLines={1}>
-              {user?.phone} · {t('profile.changePhoto')}
+              {user?.phone}
+            </Text>
+            <Text style={[Type.footnoteEmphasized, { color: theme.primary }]} numberOfLines={1}>
+              {t('profile.changePhoto')}
             </Text>
           </View>
           <Icon name="chevron-forward" size={17} color={theme.textTertiary} />
