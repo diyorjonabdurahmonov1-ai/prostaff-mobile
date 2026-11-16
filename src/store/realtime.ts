@@ -62,6 +62,9 @@ const ALERT_EVENTS = [
   'notification.new',
 ];
 
+/** A stored message older than this is never put on screen as a new banner. */
+const STALE_BANNER_MS = 10 * 60_000;
+
 /** An invite still worth showing: open, and inside its window. */
 export function isActiveInvite(order: Order): boolean {
   if (order.status !== 'invited' && order.status !== 'matching') return false;
@@ -535,11 +538,15 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
             for (const n of fresh) {
               // Out of sight, the server's push has already told them; showing
               // the same message again from here is the second ring.
-              if (AppState.currentState === 'active') {
+              // Only what is actually new. Anything older than this has been
+              // sitting in the inbox — a read that came back late, a phone that
+              // was off — and a banner for it is a replay, not news.
+              const age = Date.now() - Date.parse(n.created_at);
+              if (AppState.currentState === 'active' && !(age > STALE_BANNER_MS)) {
                 presentLocalNotification({
                   title: n.title || 'PROSTAFF',
                   body: n.body,
-                  data: { type: n.type, notification_id: n.id },
+                  data: { ...(n.data ?? {}), type: n.type, notification_id: n.id },
                 });
               }
               // A new order for a firm: with the app out of sight the pill turns
