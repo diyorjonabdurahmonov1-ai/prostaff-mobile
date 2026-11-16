@@ -63,6 +63,9 @@ const ALERT_EVENTS = [
   'notification.new',
 ];
 
+/** A stored message older than this is never put on screen as a new banner. */
+const STALE_BANNER_MS = 10 * 60_000;
+
 /** An invite still worth showing: open, and inside its window. */
 export function isActiveInvite(order: Order): boolean {
   if (order.status !== 'invited' && order.status !== 'matching') return false;
@@ -519,13 +522,33 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
+    // One read at a time. Opening the app starts the first read, and the socket
+    // connecting a moment later asks for another before the first has come
+    // back — both with no watermark, so both got the whole inbox. The first
+    // marked the pass as primed; the second then showed every old message as a
+    // new banner: yesterday's orders and a top-up from two months ago, all at
+    // once. A read asked for while one is running waits and runs after it.
+    let running = false;
+    let again = false;
+
     const tick = async () => {
+      if (running) {
+        again = true;
+        return;
+      }
+      running = true;
       timer = null;
       try {
         const since = sinceRef.current;
-        const fresh = await api.get<AppNotification[]>('/notifications', {
+        const got = await api.get<AppNotification[]>('/notifications', {
           query: since ? { since } : undefined,
         });
+        // Whatever the watermark became while this was in flight, nothing at or
+        // before it is new.
+        const mark = sinceRef.current ? Date.parse(sinceRef.current) : NaN;
+        const fresh = Number.isNaN(mark)
+          ? got
+          : got?.filter((n) => Date.parse(n.created_at) > mark);
         if (!cancelled && fresh && fresh.length > 0) {
           // Watermark forward so each poll only asks for what is new. The list
           // comes back newest-first, so that is `fresh[0]` — taking the last
@@ -538,11 +561,15 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
             for (const n of fresh) {
               // Out of sight, the server's push has already told them; showing
               // the same message again from here is the second ring.
-              if (AppState.currentState === 'active') {
+              // Only what is actually new. Anything older than this has been
+              // sitting in the inbox — a read that came back late, a phone that
+              // was off — and a banner for it is a replay, not news.
+              const age = Date.now() - Date.parse(n.created_at);
+              if (AppState.currentState === 'active' && !(age > STALE_BANNER_MS)) {
                 presentLocalNotification({
                   title: n.title || 'PROSTAFF',
                   body: n.body,
-                  data: { type: n.type, notification_id: n.id },
+                  data: { ...(n.data ?? {}), type: n.type, notification_id: n.id },
                 });
               }
               // A new order for a firm: with the app out of sight the pill turns
@@ -550,6 +577,7 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
               if (
                 (n.type === 'order.new' || n.type === 'order.invite') &&
                 AppState.currentState !== 'active' &&
+                !(age > STALE_BANNER_MS) &&
                 onlineRef.current
               ) {
                 ringBubble(n.title || 'Yangi buyurtma!');
@@ -562,8 +590,14 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
       } catch {
         // swallow — the next tick retries
       } finally {
-        catchUpRef.current = false;
-        scheduleNext();
+        running = false;
+        if (again && !cancelled) {
+          again = false;
+          tick();
+        } else {
+          catchUpRef.current = false;
+          scheduleNext();
+        }
       }
     };
 

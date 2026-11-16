@@ -344,12 +344,38 @@ export async function ensureNotificationPermission(): Promise<boolean> {
  * Local notifications — work in Expo Go and without a push server
  * ------------------------------------------------------------------ */
 
+/**
+ * What the device has already posted, by what it was about.
+ *
+ * The same event reaches the app by more than one road — the invite poll and the
+ * stored notification both announce a new order — and each used to post its own
+ * banner, so one job rang two or three times. A message is keyed by its stored
+ * id, or by its type and order; whichever road gets there first posts it and
+ * the rest are dropped.
+ */
+const postedAt = new Map<string, number>();
+const POSTED_MEMORY_MS = 10 * 60_000;
+
+function alreadyPosted(data?: Record<string, unknown>): boolean {
+  const type = typeof data?.type === 'string' ? data.type : '';
+  const orderId = typeof data?.order_id === 'string' ? data.order_id : '';
+  const noteId = typeof data?.notification_id === 'string' ? data.notification_id : '';
+  const keys = [noteId && `n:${noteId}`, orderId && `o:${type}:${orderId}`].filter(Boolean) as string[];
+  if (keys.length === 0) return false;
+  const now = Date.now();
+  for (const [k, at] of postedAt) if (now - at > POSTED_MEMORY_MS) postedAt.delete(k);
+  const seen = keys.some((k) => postedAt.has(k));
+  for (const k of keys) postedAt.set(k, now);
+  return seen;
+}
+
 /** Posts a notification from the device itself, right now. */
 export async function presentLocalNotification(input: {
   title: string;
   body?: string;
   data?: Record<string, unknown>;
 }): Promise<void> {
+  if (alreadyPosted(input.data)) return;
   // Only orders ring. Everything else — a role change, a message from the
   // office — gets the soft chime channel (when this phone has it).
   const type = typeof input.data?.type === 'string' ? input.data.type : '';
