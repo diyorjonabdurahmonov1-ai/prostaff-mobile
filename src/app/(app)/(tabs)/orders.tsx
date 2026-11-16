@@ -36,6 +36,7 @@ import {
 import { categoryName, formatSom } from '@/lib/format';
 import type { Order, OrderStatus } from '@/lib/types';
 
+import { CategoryArt } from '@/components/category-art';
 import { Icon } from '@/components/ui/icon';
 import { Backdrop } from '@/components/backdrop';
 
@@ -185,9 +186,10 @@ export default function OrdersScreen() {
                         styles.row,
                         pressed && { backgroundColor: theme.highlight },
                       ]}>
+                      <CategoryArt calm category={byId(order.category_id)} width={48} height={48} radius={14} />
                       <View style={styles.rowBody}>
                         <View style={styles.rowTop}>
-                          <Text style={[Type.body, styles.title, { color: theme.text }]} numberOfLines={1}>
+                          <Text style={[Type.bodyEmphasized, styles.title, { color: theme.text }]} numberOfLines={1}>
                             {categoryName(byId(order.category_id), lang) || t('company.orderTitle')}
                           </Text>
                           <StatusPill status={order.status} />
@@ -510,9 +512,9 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     paddingHorizontal: Layout.gutter,
-    paddingVertical: 12,
+    paddingVertical: 14,
     minHeight: Layout.rowHeight,
   },
   rowBody: { flex: 1, gap: 4 },

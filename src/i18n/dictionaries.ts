@@ -181,7 +181,7 @@ export const uz = {
 
   // tabs
   'tab.home': 'Bosh sahifa',
-  'tab.orders': "E'lonlarim",
+  'tab.orders': 'Buyurtmalar',
   'tab.profile': 'Profil',
 
   // home
@@ -442,7 +442,7 @@ export const uz = {
   'rate.thanks': 'Bahoyingiz uchun rahmat!',
 
   // orders list
-  'orders.title': "Mening e'lonlarim",
+  'orders.title': 'Mening buyurtmalarim',
   'orders.none': "Hali buyurtmalar yo'q",
   'orders.noneHint': 'Bosh sahifadan yangi buyurtma bering',
   'orders.number': 'Buyurtma',
@@ -755,7 +755,7 @@ export const uz = {
   'support.title': 'Yordam xizmati',
   'support.subtitle': 'Qulay usulni tanlang — imkon qadar tez javob beramiz.',
   'support.telegram': 'Telegram',
-  'support.phone': "Telefon qo'ng'iroq",
+  'support.phone': "Qo'ng'iroq",
   'support.telegramTitle': 'Telegramda yozish',
   'support.telegramHint':
     "Qurilmangizda bir nechta Telegram ilovasi bo'lsa, qaysi birida ochishni o'zingiz tanlaysiz.",
