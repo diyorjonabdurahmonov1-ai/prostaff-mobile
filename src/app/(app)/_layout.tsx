@@ -6,6 +6,7 @@ import { CardPaymentHost } from '@/components/card-payment-host';
 import { useTheme } from '@/hooks/use-theme';
 import { useLiveLocation } from '@/hooks/use-live-location';
 import { useAwayBubble } from '@/hooks/use-away-bubble';
+import { hideBubble } from '@/lib/overlay';
 import { useWorkRequirements } from '@/hooks/use-work-requirements';
 import { startBackgroundLocation, stopBackgroundLocation } from '@/lib/background-location';
 import { setLiveLocation } from '@/lib/company-live';
@@ -31,6 +32,20 @@ export default function AppLayout() {
   const theme = useTheme();
   const router = useRouter();
   const { user, activeMode } = useAuth();
+
+  // The pill over other apps belongs to an app that is out of sight. It can be
+  // left standing — "Yangi buyurtma!" rung while the worker was away, or the
+  // app closed from the recents list — and only the provider screens used to
+  // take it down, so opening the app on the customer home left it hanging over
+  // the screen until the worker went to their profile. Whatever screen is in
+  // front, an app in front shows no pill.
+  useEffect(() => {
+    if (AppState.currentState === 'active') hideBubble();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') hideBubble();
+    });
+    return () => sub.remove();
+  }, []);
 
   // Keep the push token registered while signed in — the endpoint is behind
   // auth, so doing this on bare mount just 401s and push never worked. One
