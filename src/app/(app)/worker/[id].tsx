@@ -188,7 +188,7 @@ export default function WorkerDetailScreen() {
         {worker.address ? <Row title={t('workerDetail.address')} value={worker.address} /> : null}
         <Row
           title={t('workerDetail.priceRange')}
-          value={`${formatSom(worker.price_min)}–${formatSom(worker.price_max)}`}
+          value={`${formatSom(worker.price_min)} ${t('common.som')}`}
         />
         <Row title={t('workerDetail.memberSince')} value={createdDate} />
       </Section>
