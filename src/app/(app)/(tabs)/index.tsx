@@ -1072,7 +1072,7 @@ const styles = StyleSheet.create({
   },
   greetingText: { flex: 1, gap: 1 },
   bell: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  carousel: { marginTop: 28 },
+  carousel: {},
 
   sectionCaption: { paddingHorizontal: Layout.gutter + 4, paddingBottom: 8 },
 
