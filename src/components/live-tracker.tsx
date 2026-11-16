@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, AppState, Easing, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { AppMap } from '@/components/app-map';
@@ -68,8 +68,11 @@ export function LiveTracker({ orderId, workerName }: { orderId: string; workerNa
 
   useEffect(() => {
     let live = true;
-    const load = () =>
-      api
+    // Only while the app is on screen: a phone in a pocket has nobody watching
+    // the map, and every poll costs battery and data. Coming back reads at once.
+    const load = () => {
+      if (AppState.currentState !== 'active') return;
+      return api
         .get<Tracking>(`/orders/${orderId}/tracking`)
         .then((r) => {
           if (!live) return;
@@ -80,11 +83,16 @@ export function LiveTracker({ orderId, workerName }: { orderId: string; workerNa
           }
         })
         .catch(() => {});
+    };
     load();
     const id = setInterval(load, POLL_MS);
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') load();
+    });
     return () => {
       live = false;
       clearInterval(id);
+      appState.remove();
     };
   }, [orderId]);
 
