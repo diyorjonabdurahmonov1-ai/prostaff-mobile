@@ -22,3 +22,24 @@ export function getCurrentLang(): Language {
 export function tNow(key: TranslationKey): string {
   return dictionaries[current][key] ?? dictionaries.uz[key] ?? key;
 }
+
+/**
+ * The message for a server error code, in the app's language.
+ *
+ * The server writes its refusals in Uzbek. Rather than show a Russian-speaking
+ * customer an Uzbek sentence, the app owns the wording of the codes it knows and
+ * falls back to the server's own text for any it does not.
+ */
+export function errorText(
+  code: string,
+  fallback: string,
+  params?: Record<string, string | number>,
+): string {
+  const own = dictionaries[current] as Record<string, string>;
+  const uz = dictionaries.uz as Record<string, string>;
+  const template = own[`err.${code}`] ?? uz[`err.${code}`];
+  if (!template) return fallback;
+  return template.replace(/\{(\w+)\}/g, (m, name: string) =>
+    params && name in params ? String(params[name]) : m,
+  );
+}
