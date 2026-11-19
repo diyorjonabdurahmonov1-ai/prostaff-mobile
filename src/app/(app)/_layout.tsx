@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { CardPaymentHost } from '@/components/card-payment-host';
+import { ConnectionBanner } from '@/components/connection-banner';
 import { useTheme } from '@/hooks/use-theme';
 import { useLiveLocation } from '@/hooks/use-live-location';
 import { useAwayBubble } from '@/hooks/use-away-bubble';
@@ -112,6 +113,7 @@ export default function AppLayout() {
           to put the card and SMS-code steps on screen, so no screen that buys
           something has to know they exist. */}
       <CardPaymentHost />
+      <ConnectionBanner />
       <DevicePing />
       {isWorker ? <WorkerLocationGuard /> : null}
       {isCompany ? <CompanyPresenceGuard /> : null}
