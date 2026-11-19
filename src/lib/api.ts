@@ -13,6 +13,7 @@
 
 import { Platform } from 'react-native';
 
+import { reportNetwork } from '@/lib/connection';
 import { getDeviceId } from '@/lib/device-id';
 
 const DEFAULT_PORT = 8080;
@@ -214,14 +215,18 @@ async function request<T>(
   } catch (err) {
     done();
     if (timeout?.signal.aborted) {
+      reportNetwork(false);
       throw new ApiError('timeout', 'Server javob bermadi. Qaytadan urinib ko‘ring.', 0);
     }
+    // A request the caller cancelled says nothing about the line.
+    if (!(options.signal?.aborted)) reportNetwork(false);
     throw new ApiError(
       'network_error',
       err instanceof Error ? err.message : 'Network request failed',
       0
     );
   }
+  reportNetwork(true);
 
   // --- Auto-refresh on 401 ---
   if (res.status === 401 && !options._skipRefresh && authToken) {
