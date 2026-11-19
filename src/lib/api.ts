@@ -14,6 +14,7 @@
 import { Platform } from 'react-native';
 
 import { reportNetwork } from '@/lib/connection';
+import { getCurrentLang } from '@/i18n/current';
 import { getDeviceId } from '@/lib/device-id';
 
 const DEFAULT_PORT = 8080;
@@ -188,7 +189,12 @@ async function request<T>(
   body?: unknown,
   options: RequestOptions = {}
 ): Promise<T> {
-  const headers: Record<string, string> = { Accept: 'application/json', 'X-Device-Id': await getDeviceId() };
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'X-Device-Id': await getDeviceId(),
+    // So the server writes pushes and inbox messages in the language the app uses.
+    'X-App-Lang': getCurrentLang(),
+  };
   const token = options.token !== undefined ? options.token : authToken;
   if (token) headers.Authorization = `Bearer ${token}`;
 
