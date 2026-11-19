@@ -329,14 +329,18 @@ export function useInviteAlerts(enabled: boolean, intervalMs = DEFAULT_INTERVAL)
           // The first pass only records what is already open — opening the app
           // should not replay every invite as a fresh banner.
           if (primedRef.current && onlineRef.current) {
-            presentLocalNotification({
-              title: 'Yangi buyurtma!',
-              body: order.description || undefined,
-              data: { type: 'order.invite', order_id: order.id },
-            });
-            // With the app out of sight, the bubble turns into an alert and the
-            // app comes back to the front, so the order is on screen at once.
-            if (AppState.currentState !== 'active' && onlineRef.current) {
+            if (AppState.currentState === 'active') {
+              // Foreground only: with the app out of sight the server's push has
+              // already rung the phone, and a banner from here on top of it was
+              // the second "Yangi buyurtma!" every provider kept getting.
+              presentLocalNotification({
+                title: 'Yangi buyurtma!',
+                body: order.description || undefined,
+                data: { type: 'order.invite', order_id: order.id },
+              });
+            } else {
+              // With the app out of sight, the bubble turns into an alert and the
+              // app comes back to the front, so the order is on screen at once.
               ringBubble('Yangi buyurtma!');
               bringToFront();
             }

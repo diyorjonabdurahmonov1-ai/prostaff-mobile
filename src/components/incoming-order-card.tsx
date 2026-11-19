@@ -233,8 +233,8 @@ function TimerBar({ remaining, color }: { remaining: number; color: string }) {
   const width = useSharedValue(1);
 
   useEffect(() => {
-    // 120s is the server's search window (store.InviteTTL).
-    width.value = withTiming(Math.max(0, Math.min(1, remaining / 120)), {
+    // 50s is the server's search window (store.InviteTTL).
+    width.value = withTiming(Math.max(0, Math.min(1, remaining / 50)), {
       duration: 550,
       easing: Ease.linear,
     });
