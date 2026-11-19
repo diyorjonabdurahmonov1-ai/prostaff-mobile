@@ -345,12 +345,12 @@ export default function WorkDetailScreen() {
   );
 }
 
-/** Drains left-to-right over the server's 120-second search window. */
+/** Drains left-to-right over the server's 50-second search window. */
 function TimerBar({ remaining, color }: { remaining: number; color: string }) {
   const width = useSharedValue(1);
 
   useEffect(() => {
-    width.value = withTiming(Math.max(0, Math.min(1, remaining / 120)), {
+    width.value = withTiming(Math.max(0, Math.min(1, remaining / 50)), {
       duration: 550,
       easing: Ease.linear,
     });

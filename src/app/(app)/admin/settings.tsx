@@ -113,7 +113,7 @@ export default function AdminSettingsScreen() {
             iconColor="#5E5CE6"
             title="Javob vaqti"
             subtitle="Ishchi qabul qilish vaqti"
-            value="2 daq"
+            value="50 soniya"
           />
           <Row
             icon="resize"
