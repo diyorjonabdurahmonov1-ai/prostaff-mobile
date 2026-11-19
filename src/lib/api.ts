@@ -14,7 +14,7 @@
 import { Platform } from 'react-native';
 
 import { reportNetwork } from '@/lib/connection';
-import { getCurrentLang } from '@/i18n/current';
+import { errorText, getCurrentLang } from '@/i18n/current';
 import { getDeviceId } from '@/lib/device-id';
 
 const DEFAULT_PORT = 8080;
@@ -222,13 +222,13 @@ async function request<T>(
     done();
     if (timeout?.signal.aborted) {
       reportNetwork(false);
-      throw new ApiError('timeout', 'Server javob bermadi. Qaytadan urinib ko‘ring.', 0);
+      throw new ApiError('timeout', errorText('timeout', 'Server javob bermadi. Qaytadan urinib ko‘ring.'), 0);
     }
     // A request the caller cancelled says nothing about the line.
     if (!(options.signal?.aborted)) reportNetwork(false);
     throw new ApiError(
       'network_error',
-      err instanceof Error ? err.message : 'Network request failed',
+      errorText('network_error', err instanceof Error ? err.message : 'Network request failed'),
       0
     );
   }
@@ -264,11 +264,11 @@ async function request<T>(
     text = await res.text();
   } catch (err) {
     if (timeout?.signal.aborted) {
-      throw new ApiError('timeout', 'Server javob bermadi. Qaytadan urinib ko‘ring.', 0);
+      throw new ApiError('timeout', errorText('timeout', 'Server javob bermadi. Qaytadan urinib ko‘ring.'), 0);
     }
     throw new ApiError(
       'network_error',
-      err instanceof Error ? err.message : 'Network request failed',
+      errorText('network_error', err instanceof Error ? err.message : 'Network request failed'),
       0
     );
   } finally {
@@ -284,9 +284,15 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    const envelope = data as { error?: { code?: string; message?: string } } | undefined;
+    const envelope = data as
+      | { error?: { code?: string; message?: string; min_price?: number } }
+      | undefined;
     const code = envelope?.error?.code ?? `http_${res.status}`;
-    const message = envelope?.error?.message ?? `Request failed (${res.status})`;
+    const serverText = envelope?.error?.message ?? `Request failed (${res.status})`;
+    const min = envelope?.error?.min_price;
+    const message = errorText(code, serverText, {
+      min: min == null ? '' : String(min).replace(/\B(?=(\d{3})+(?!\d))/g, ' '),
+    });
     throw new ApiError(code, message, res.status);
   }
 
