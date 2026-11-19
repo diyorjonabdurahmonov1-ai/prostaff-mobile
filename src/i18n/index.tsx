@@ -14,6 +14,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import { setCurrentLang } from './current';
 import { dictionaries, LANGUAGES, type Language, type TranslationKey } from './dictionaries';
 
 const STORAGE_KEY = 'prostaff.lang';
@@ -48,6 +49,11 @@ async function readStoredLang(): Promise<Language | null> {
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Language>('uz');
+
+  // Mirrored for code outside React (see ./current).
+  useEffect(() => {
+    setCurrentLang(lang);
+  }, [lang]);
 
   useEffect(() => {
     let active = true;

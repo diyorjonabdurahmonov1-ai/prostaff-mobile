@@ -20,6 +20,7 @@
 import { AppState } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { tNow } from '@/i18n/current';
 import { api } from '@/lib/api';
 import { onOrderAlert, presentLocalNotification } from '@/lib/notifications';
 import { bringToFront, ringBubble } from '@/lib/overlay';
@@ -334,14 +335,14 @@ export function useInviteAlerts(enabled: boolean, intervalMs = DEFAULT_INTERVAL)
               // already rung the phone, and a banner from here on top of it was
               // the second "Yangi buyurtma!" every provider kept getting.
               presentLocalNotification({
-                title: 'Yangi buyurtma!',
+                title: tNow('incoming.title'),
                 body: order.description || undefined,
                 data: { type: 'order.invite', order_id: order.id },
               });
             } else {
               // With the app out of sight, the bubble turns into an alert and the
               // app comes back to the front, so the order is on screen at once.
-              ringBubble('Yangi buyurtma!');
+              ringBubble(tNow('bubble.newOrder'));
               bringToFront();
             }
           }
@@ -584,7 +585,7 @@ export function useNotificationBridge(enabled: boolean, intervalMs = DEFAULT_INT
                 !(age > STALE_BANNER_MS) &&
                 onlineRef.current
               ) {
-                ringBubble(n.title || 'Yangi buyurtma!');
+                ringBubble(n.title || tNow('bubble.newOrder'));
                 bringToFront();
               }
             }
