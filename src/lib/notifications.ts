@@ -24,8 +24,19 @@ import { AppState, Platform } from 'react-native';
 
 import { api } from '@/lib/api';
 
-/** Android channel the backend also targets via `channelId` on its pushes. */
-export const ORDERS_CHANNEL = 'orders_v2';
+/**
+ * Android channel the backend also targets via `channelId` on its pushes.
+ *
+ * `orders_v4` rings on the alarm stream. A notification's sound follows the
+ * phone's ringer switch, so on silent or vibrate an order arrived as a buzz and
+ * nothing else — the one moment the sound matters most. The alarm stream is not
+ * muted by the ringer switch (only by the volume of alarms), which is what an
+ * alarm clock relies on. A channel's audio cannot be changed once it exists, so
+ * this is a new channel; `orders_v2` stays for servers that have not heard yet.
+ */
+export const ORDERS_CHANNEL = 'orders_v4';
+/** The previous order channel: same ring, but on the notification stream. */
+const ORDERS_V2_CHANNEL = 'orders_v2';
 /**
  * The channel builds before the three-second ring used. A channel's sound is
  * fixed when it is created and cannot be changed afterwards, so a new sound is a
@@ -49,7 +60,9 @@ let generalChannelReady = false;
  */
 function declaredChannel(): string | null {
   if (Platform.OS !== 'android' || !ordersChannelReady) return null;
-  return generalChannelReady ? 'orders_v3' : ORDERS_CHANNEL;
+  // `orders_v4` means "I have orders_v4 and general_v1" (the handshake, as
+  // `orders_v3` was for orders_v2).
+  return generalChannelReady ? 'orders_v4' : ORDERS_V2_CHANNEL;
 }
 
 type NotificationsModule = typeof import('expo-notifications');
@@ -272,17 +285,34 @@ async function ensureAndroidChannels() {
       sound: 'notify_chime.wav',
     });
     generalChannelReady = true;
-    await Notifications.setNotificationChannelAsync(ORDERS_CHANNEL, {
-      name: 'Buyurtmalar',
+    // Kept as it was, for a server that still names it.
+    await Notifications.setNotificationChannelAsync(ORDERS_V2_CHANNEL, {
+      name: 'Buyurtmalar (eski)',
       importance: Notifications.AndroidImportance.MAX,
-      // Three rings and three buzzes, about three seconds in all: long enough
-      // to be heard over a navigator's voice, short enough not to be a siren.
       vibrationPattern: [0, 700, 300, 700, 300, 700],
       lightColor: '#534AB7',
       bypassDnd: true,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       enableVibrate: true,
       sound: 'order_ring.wav',
+    });
+    // Three rings and three buzzes, about three seconds in all: long enough to
+    // be heard over a navigator's voice, short enough not to be a siren — and on
+    // the alarm stream, so a phone on silent or vibrate still rings.
+    await Notifications.setNotificationChannelAsync(ORDERS_CHANNEL, {
+      name: 'Buyurtmalar',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 700, 300, 700, 300, 700],
+      lightColor: '#534AB7',
+      bypassDnd: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      enableVibrate: true,
+      sound: 'order_ring.wav',
+      audioAttributes: {
+        usage: Notifications.AndroidAudioUsage.ALARM,
+        contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+        flags: { enforceAudibility: true, requestHardwareAudioVideoSynchronization: false },
+      },
     });
     ordersChannelReady = true;
   } catch {
